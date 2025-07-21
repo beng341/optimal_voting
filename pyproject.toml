@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "optimal-voting"
+version = "0.0.1"
+description = "Functionality to optimize different classes of voting rules for user-defined goals."
+authors = [{name = "Ben Armstrong", email = "research@benarmstrong.ca"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.25.0",
+    # Add your dependencies here
+    "numpy>=1.26.4",
+    "pandas>=2.2.2",
+    "abcvoting>=2.11.0",
+    "pref-voting>=1.13.18",
+    "seaborn>=0.13.2",
+    "simanneal>=0.5.0",
+#    "tinycss2>=1.4.0"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/your-package"
+Repository = "https://github.com/yourusername/your-package"

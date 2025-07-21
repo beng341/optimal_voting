@@ -1,0 +1,17 @@
+LICENSE
+README.md
+pyproject.toml
+src/__init__.py
+src/optimal_voting/OptimizableRule.py
+src/optimal_voting/__init__.py
+src/optimal_voting/annealing.py
+src/optimal_voting/annealing_experiments.py
+src/optimal_voting/data_utils.py
+src/optimal_voting/evaluation.py
+src/optimal_voting/main.py
+src/optimal_voting/voting_utils.py
+src/optimal_voting.egg-info/PKG-INFO
+src/optimal_voting.egg-info/SOURCES.txt
+src/optimal_voting.egg-info/dependency_links.txt
+src/optimal_voting.egg-info/requires.txt
+src/optimal_voting.egg-info/top_level.txt
