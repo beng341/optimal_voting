@@ -11,7 +11,8 @@ import sys
 from collections import defaultdict
 
 # import voting_utils as vu
-from voting_utils import normalize_score_vector, score_vector_winner
+# from voting_utils import normalize_score_vector, score_vector_winner
+from .voting_utils import normalize_score_vector, score_vector_winner
 from simanneal import Annealer
 
 

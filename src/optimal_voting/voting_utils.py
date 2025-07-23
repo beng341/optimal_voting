@@ -1,6 +1,6 @@
 import numpy as np
 import pref_voting.profiles
-import data_utils
+from . import data_utils
 
 
 def social_welfare_for_alternative_single_profile(utilities, alternatives, type="utilitarian"):

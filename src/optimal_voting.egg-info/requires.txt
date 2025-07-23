@@ -1,1 +1,7 @@
 requests>=2.25.0
+numpy>=1.26.4
+pandas>=2.2.2
+abcvoting>=2.10.0
+pref-voting>=1.13.18
+seaborn>=0.13.2
+simanneal>=0.5.0
