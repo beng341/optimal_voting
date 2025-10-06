@@ -1,6 +1,6 @@
 import numpy as np
 import pref_voting.profiles
-import data_utils
+from optimal_voting.data_utils import load_utility_vectors, load_profiles, make_mixed_preference_profiles, utilities_from_profile
 
 
 def weighted_tournament(profile):
@@ -73,36 +73,6 @@ def social_welfare_for_alternative_single_profile(utilities, alternatives, type=
     return sw
 
 
-def score_vector_winner_old(score_vector, profile, randomized=False):
-    """
-    Compute winning alternative given rankings and a score vector. Each voter gives their favourite alternative points
-    equal to the first value in score vector, second favourite the second value, etc.
-    :param score_vector:
-    :param profile:
-    :return:
-    """
-    winner = None
-    alternative_scores = [0 for _ in range(len(score_vector))]
-    m = len(score_vector)
-
-    for ranking in profile:
-        for idx, c in enumerate(ranking):
-            alternative_scores[c] += score_vector[idx]
-
-    if not randomized:
-        winner = np.argmax(alternative_scores)
-    elif randomized:
-        if sum(alternative_scores) == 0:
-            prob_normed = [1/m for _ in range(m)]
-        else:
-            prob_normed = [s/sum(alternative_scores) for s in alternative_scores]
-        winner = np.random.choice(list(range(m)), size=1, p=prob_normed)[0]
-        # winner_examples = np.random.choice(list(range(m)), size=20, p=prob_normed)
-        # print("Using randomized rule but not tested!")
-
-    return winner
-
-
 def score_vector_winner(score_vector, profile, return_complete_results=False, randomize=False):
     """
 
@@ -147,45 +117,27 @@ def score_vector_winner(score_vector, profile, return_complete_results=False, ra
 
 
 def utilitarian_distortion(unique_id, winners, profile, **kwargs):
-    # randomize = kwargs["randomize"] if "randomize" in kwargs else False
-    # winner = score_vector_winner(score_vector, profile, return_complete_results=False, randomize=randomize)
-    sw = social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="distortion-utilitarian")
-    return sw
+    return social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="distortion-utilitarian")
 
 
 def egalitarian_distortion(unique_id, winners, profile, **kwargs):
-    # randomize = kwargs["randomize"] if "randomize" in kwargs else False
-    # winner = score_vector_winner(score_vector, profile, return_complete_results=False, randomize=randomize)
-    sw = social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="distortion-egalitarian")
-    return sw
+    return social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="distortion-egalitarian")
 
 
 def utilitarian_social_welfare(unique_id, winners, profile, **kwargs):
-    # randomize = kwargs["randomize"] if "randomize" in kwargs else False
-    # winner = score_vector_winner(score_vector, profile, return_complete_results=False, randomize=randomize)
-    sw = social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="utilitarian")
-    return sw
+    return social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="utilitarian")
 
 
 def nash_social_welfare(unique_id, winners, profile, **kwargs):
-    # randomize = kwargs["randomize"] if "randomize" in kwargs else False
-    # winner = score_vector_winner(score_vector, profile, return_complete_results=False, randomize=randomize)
-    sw = social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="nash_welfare")
-    return sw
+    return social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="nash_welfare")
 
 
 def egalitarian_social_welfare(unique_id, winners, profile, **kwargs):
-    # randomize = kwargs["randomize"] if "randomize" in kwargs else False
-    # winner = score_vector_winner(score_vector, profile, return_complete_results=False, randomize=randomize)
-    sw = social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="egalitarian")
-    return sw
+    return social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="egalitarian")
 
 
 def malfare_social_welfare(unique_id, winners, profile, **kwargs):
-    # randomize = kwargs["randomize"] if "randomize" in kwargs else False
-    # winner = score_vector_winner(score_vector, profile, return_complete_results=False, randomize=randomize)
-    sw = social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="malfare")
-    return sw
+    return social_welfare_for_alternative_single_profile(kwargs["utilities"][unique_id], winners, type="malfare")
 
 
 # def social_welfare_of_score_vector_over_many_profiles(score_vector, profiles, utilities, utility_type="utilitarian"):
@@ -265,13 +217,15 @@ def score_vector_examples(m=5):
 
 if __name__ == "__main__":
     m = 10
-    all_utilities = data_utils.load_utility_vectors(m=m)
-    all_profiles = data_utils.load_profiles(m=m)
+    all_profiles = make_mixed_preference_profiles(profiles_per_distribution=10,
+                                                  n=10,
+                                                  m=10)
+    all_utilities = [utilities_from_profile(profile, normalize_utilities=True, utility_type="uniform_random") for profile in all_profiles]
 
     vectors = score_vector_examples(m)
 
-    # for vec_name, vec in vectors.items():
-    #     sw = social_welfare_of_score_vector_over_many_profiles(vec, profiles=all_profiles, utilities=all_utilities)
-    #     print(f"SW for {vec} is {sw}")
-    #     sw = social_welfare_of_score_vector_over_many_profiles(normalize_score_vector(vec), profiles=all_profiles, utilities=all_utilities)
-    #     print(f"SW for (normed) {vec} is {sw}")
+    for vec_name, vec in vectors.items():
+        sw = social_welfare_of_score_vector_over_many_profiles(vec, profiles=all_profiles, utilities=all_utilities)
+        print(f"SW for {vec} is {sw}")
+        sw = social_welfare_of_score_vector_over_many_profiles(normalize_score_vector(vec), profiles=all_profiles, utilities=all_utilities)
+        print(f"SW for (normed) {vec} is {sw}")

@@ -26,58 +26,7 @@ def get_utility_eval_func_from_str(util_type):
     return eval_func
 
 
-def generate_preference_profiles(profiles_per_distribution, n, m, seed=None):
-    profiles_descriptions = [
-        du.ProfilesDescription("IC",
-                               num_profiles=profiles_per_distribution,
-                               num_voters=n,
-                               num_candidates=m,
-                               args=None),
-        du.ProfilesDescription("single_peaked_conitzer",
-                               num_profiles=profiles_per_distribution,
-                               num_voters=n,
-                               num_candidates=m,
-                               args=None),
-        du.ProfilesDescription("single_peaked_walsh",
-                               num_profiles=profiles_per_distribution,
-                               num_voters=n,
-                               num_candidates=m,
-                               args=None),
-        du.ProfilesDescription("MALLOWS-RELPHI-R",
-                               num_profiles=profiles_per_distribution,
-                               num_voters=n,
-                               num_candidates=m,
-                               args=None),
-        du.ProfilesDescription("URN-R",
-                               num_profiles=profiles_per_distribution,
-                               num_voters=n,
-                               num_candidates=m,
-                               args=None),
-        du.ProfilesDescription("euclidean",
-                               num_profiles=profiles_per_distribution,
-                               num_voters=n,
-                               num_candidates=m,
-                               args={"num_dimensions": 3, "space": "uniform_sphere"}),
-        du.ProfilesDescription("euclidean",
-                               num_profiles=profiles_per_distribution,
-                               num_voters=n,
-                               num_candidates=m,
-                               args={"num_dimensions": 10, "space": "uniform_sphere"}),
-        du.ProfilesDescription("euclidean",
-                               num_profiles=profiles_per_distribution,
-                               num_voters=n,
-                               num_candidates=m,
-                               args={"num_dimensions": 3, "space": "uniform_cube"}),
-        du.ProfilesDescription("euclidean",
-                               num_profiles=profiles_per_distribution,
-                               num_voters=n,
-                               num_candidates=m,
-                               args={"num_dimensions": 10, "space": "uniform_cube"}),
-    ]
 
-    profiles = du.create_profiles(profiles_descriptions=profiles_descriptions, seed=seed)
-
-    return profiles
 
 
 def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_type="utilitarian",
@@ -91,8 +40,8 @@ def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_
     random.seed(seed)
 
     eval_func = get_utility_eval_func_from_str(util_type)
-    profiles = generate_preference_profiles(profiles_per_distribution=profiles_per_dist, n=n_voters, m=n_candidates)
-    utilities = [du._utilities_from_profile(profile) for profile in profiles]
+    profiles = du.make_mixed_preference_profiles(profiles_per_distribution=profiles_per_dist, n=n_voters, m=n_candidates)
+    utilities = [du.utilities_from_profile(profile) for profile in profiles]
 
     if "initial_state" in annealing_args and annealing_args["initial_state"] is not None:
         initial_state = annealing_args["initial_state"]

@@ -19,6 +19,32 @@ ProfilesDescription = namedtuple("ProfilesDescription",
                                  ]
                                  )
 
+
+def profiles_from_dict(profiles_dict, seed=None):
+    """
+    Given a dict describing which profiles to generate, return a list containing said profiles.
+    Equivalent to below method which uses ProfilesDesription namedtuples
+    """
+
+    profiles = []
+    for dist, prof_details in profiles_dict.items():
+        for _ in range(prof_details["num_profiles"]):
+            if prof_details["args"] is None:
+                args = {}
+            else:
+                args = prof_details["args"]
+            args["seed"] = seed
+            profile = gen_prof(num_voters=prof_details["num_voters"],
+                               num_candidates=prof_details["num_candidates"],
+                               probmodel=prof_details["distribution"],
+                               **args)
+            # rankings = profile.rankings
+            profiles.append(profile)
+
+    return profiles
+
+
+
 def create_profiles(profiles_descriptions, seed=None):
     """
     Given appropriate parameters create a list where each entry contains a single profile.
@@ -42,12 +68,60 @@ def create_profiles(profiles_descriptions, seed=None):
                                **args)
             # rankings = profile.rankings
             profiles.append(profile)
-    #
-    # while len(profiles) < n_profiles:
-    #     profile = gen_prof(num_voters=prefs_per_profile, num_candidates=m, probmodel=pref_model, **kwargs)
-    #     rankings = profile.rankings
-    #     profiles.append(f"{rankings}")
-    #     raw_profiles.append(profile)
+
+    return profiles
+
+
+def make_mixed_preference_profiles(profiles_per_distribution=100, n=10, m=10, seed=None):
+    profiles_descriptions = [
+        ProfilesDescription("IC",
+                               num_profiles=profiles_per_distribution,
+                               num_voters=n,
+                               num_candidates=m,
+                               args=None),
+        ProfilesDescription("single_peaked_conitzer",
+                               num_profiles=profiles_per_distribution,
+                               num_voters=n,
+                               num_candidates=m,
+                               args=None),
+        ProfilesDescription("single_peaked_walsh",
+                               num_profiles=profiles_per_distribution,
+                               num_voters=n,
+                               num_candidates=m,
+                               args=None),
+        ProfilesDescription("MALLOWS-RELPHI-R",
+                               num_profiles=profiles_per_distribution,
+                               num_voters=n,
+                               num_candidates=m,
+                               args=None),
+        ProfilesDescription("URN-R",
+                               num_profiles=profiles_per_distribution,
+                               num_voters=n,
+                               num_candidates=m,
+                               args=None),
+        ProfilesDescription("euclidean",
+                               num_profiles=profiles_per_distribution,
+                               num_voters=n,
+                               num_candidates=m,
+                               args={"num_dimensions": 3, "space": "uniform_sphere"}),
+        ProfilesDescription("euclidean",
+                               num_profiles=profiles_per_distribution,
+                               num_voters=n,
+                               num_candidates=m,
+                               args={"num_dimensions": 10, "space": "uniform_sphere"}),
+        ProfilesDescription("euclidean",
+                               num_profiles=profiles_per_distribution,
+                               num_voters=n,
+                               num_candidates=m,
+                               args={"num_dimensions": 3, "space": "uniform_cube"}),
+        ProfilesDescription("euclidean",
+                               num_profiles=profiles_per_distribution,
+                               num_voters=n,
+                               num_candidates=m,
+                               args={"num_dimensions": 10, "space": "uniform_cube"}),
+    ]
+
+    profiles = create_profiles(profiles_descriptions=profiles_descriptions, seed=seed)
 
     return profiles
 
@@ -302,7 +376,29 @@ def utilities_from_profile(profile, normalize_utilities=False, utility_type="uni
     return all_utility_vectors
 
 
-def convert_rankings_to_utilities(out_path="data", voters_per_profile=50, num_profiles=100, m=5, preference_models="all", utility_noise=True):
+def profile_from_utilies(utilities):
+    """
+    Generate a single profile based on the given utilities.
+    :param utilities: List of lists or ndarray where M[i][j] = u indicates that voter i gets utility u if j is elected.
+    :return: List of lists or ndarray (matching input value) where R[i][j] = r indicates i ranks j in position r.
+    """
+
+    use_list = True
+    if isinstance(utilities, np.ndarray):
+        use_list = False
+
+    rankings = []
+
+    for i in range(len(utilities)):
+        l = np.argsort(utilities[i])
+        rankings.append(list(reversed(l.tolist())))
+
+    if not use_list:
+        rankings = np.asarray(rankings)
+    return rankings
+
+
+def convert_saved_rankings_to_utilities(out_path="data", voters_per_profile=50, num_profiles=100, m=5, preference_models="all", utility_noise=True):
     """
 
     :return:
@@ -313,7 +409,7 @@ def convert_rankings_to_utilities(out_path="data", voters_per_profile=50, num_pr
     all_utilities = []
     for profile in profiles:
         profile = eval(profile)
-        utilities = _utilities_from_profile(profile)
+        utilities = utilities_from_profile(profile)
         all_utilities.append(utilities)
     df["utilities"] = all_utilities
 
@@ -363,7 +459,7 @@ def load_or_make_data(out_path="data", **kwargs):
     if not data_exists(**kwargs):
 
         save_profiles(**kwargs)
-        convert_rankings_to_utilities(**kwargs)
+        convert_saved_rankings_to_utilities(**kwargs)
 
     filename = f"{out_path}/profile_data-m={kwargs['m']}-preference_models={kwargs['preference_models']}-utility_noise={kwargs['utility_noise']}-voters_per_profile={kwargs['voters_per_profile']}-num_profiles={kwargs['num_profiles']}.csv"
     return pd.read_csv(filename)
@@ -386,6 +482,22 @@ def default_job_name(**kwargs):
 
 
 if __name__ == "__main__":
-    m = 10
-    save_profiles(profiles_per_dist=1, m=m)
-    convert_rankings_to_utilities(m=m)
+    # m = 10
+    # save_profiles(profiles_per_dist=1, m=m)
+    # convert_rankings_to_utilities(m=m)
+
+    utilities = [
+        [1, 5, 3, 2, 8],
+        [1, 2, 3, 4, 5],
+        [5, 4, 3, 2, 6]
+    ]
+    profile = profile_from_utilies(utilities)
+    print(profile)
+    print(type(profile))
+
+    print("-------------------")
+
+    utilities = np.asarray(utilities)
+    profile = profile_from_utilies(utilities)
+    print(profile)
+    print(type(profile))

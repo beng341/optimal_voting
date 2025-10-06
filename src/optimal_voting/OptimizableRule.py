@@ -7,16 +7,12 @@ import numpy as np
 import pandas as pd
 import pref_voting.profiles
 import abcvoting.preferences
-import data_utils as du
 import time
 import sys
 from collections import defaultdict
-
-
-# import voting_utils as vu
-# from voting_utils import normalize_score_vector, score_vector_winner
-from voting_utils import normalize_score_vector, score_vector_winner, weighted_tournament
 from simanneal import Annealer
+from optimal_voting.data_utils import utilities_from_profile
+from optimal_voting.voting_utils import normalize_score_vector, score_vector_winner, weighted_tournament
 
 
 class OptimizableRule(Annealer):
@@ -49,7 +45,7 @@ class OptimizableRule(Annealer):
                 utility_type = "linear"
             utilities = []
             for profile in profiles:
-                utilities.append(du.utilities_from_profile(profile,
+                utilities.append(utilities_from_profile(profile,
                                                            normalize_utilities=True,
                                                            utility_type=utility_type))
             kwargs["utilities"] = utilities
