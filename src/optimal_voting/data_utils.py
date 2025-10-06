@@ -5,6 +5,7 @@ import random
 
 import numpy as np
 import pandas as pd
+import pref_voting.profiles
 from pref_voting.generate_profiles import generate_profile as gen_prof
 from collections import namedtuple
 
@@ -18,7 +19,7 @@ ProfilesDescription = namedtuple("ProfilesDescription",
                                  ]
                                  )
 
-def create_profiles(profiles_descriptions):
+def create_profiles(profiles_descriptions, seed=None):
     """
     Given appropriate parameters create a list where each entry contains a single profile.
     Should pass in a list of ProfilesDescription namedtuples containing all the parameters required to generate each
@@ -34,6 +35,7 @@ def create_profiles(profiles_descriptions):
                 args = {}
             else:
                 args = prof.args
+            args["seed"] = seed
             profile = gen_prof(num_voters=prof.num_voters,
                                num_candidates=prof.num_candidates,
                                probmodel=prof.distribution,
@@ -253,9 +255,9 @@ def save_profiles(out_path="data", voters_per_profile=50, num_profiles=100, m=5,
     df.to_csv(os.path.join(out_path, filename), index=False)
 
 
-def _utilities_from_profile(profile, normalize_utilities=False):
+def utilities_from_profile(profile, normalize_utilities=False, utility_type="uniform_random"):
     """
-    Super basic function to create some arbitrary but not incorrect utility_type vector for each ranking in given profile.
+    Basic function to create some arbitrary but not incorrect utility_type vector for each ranking in given profile.
     Each utility_type vector sums to 1 like [0.3, 0.1, 0.2, 0.1, 0.3] and the value at index i indicates the utility_type a voter
     gets if alternative i is elected.
     NOTE: A ranking is given in the form [4, 3, 0, 1, 2] indicating 4 is most favourite, 3 2nd favourite, etc.
@@ -267,16 +269,22 @@ def _utilities_from_profile(profile, normalize_utilities=False):
     def _utility_from_ranking(ranking):
         m = len(ranking)
 
-        # new method -- generate random values, assign them to correct rankings
-        # utils = np.random.poisson(size=m)
-        util_values = np.random.uniform(low=0, high=2, size=m)
-        if normalize_utilities:
-            util_values = util_values - min(util_values)
-            util_values = [u/max(util_values) for u in util_values]
-            util_values.sort(reverse=True)
+        if utility_type == "linear":
+            util_values = list(range(m, 0, -1))
+            if normalize_utilities:
+                util_values = [(u - 1) / (m - 1) if m > 1 else 1.0 for u in util_values]
+        elif utility_type == "uniform_random":
+            # Generate random values, assign them to correct rankings
+            util_values = np.random.uniform(low=0, high=2, size=m)
+            if normalize_utilities:
+                util_values = util_values - min(util_values)
+                util_values = [u/max(util_values) for u in util_values]
+                util_values.sort(reverse=True)
+            else:
+                util_values = util_values.tolist()
+                util_values.sort(reverse=True)
         else:
-            util_values = util_values.tolist()
-            util_values.sort(reverse=True)
+            raise ValueError(f"Unexpected value given for 'utility_type'. Was given {utility_type}.")
 
         utilities = [0.0] * m  # put in position i the utility assigned to alternative i
         for i, preference in enumerate(ranking):
@@ -287,7 +295,8 @@ def _utilities_from_profile(profile, normalize_utilities=False):
         return utilities
 
     all_utility_vectors = []
-    for ranking in profile._rankings:
+    rankings = profile._rankings if isinstance(profile, pref_voting.profiles.Profile) else profile
+    for ranking in rankings:
         all_utility_vectors.append(_utility_from_ranking(ranking))
 
     return all_utility_vectors

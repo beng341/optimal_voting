@@ -1,3 +1,5 @@
+import random
+
 import data_utils as du
 import voting_utils as vu
 import pandas as pd
@@ -24,7 +26,7 @@ def get_utility_eval_func_from_str(util_type):
     return eval_func
 
 
-def generate_preference_profiles(profiles_per_distribution, n, m):
+def generate_preference_profiles(profiles_per_distribution, n, m, seed=None):
     profiles_descriptions = [
         du.ProfilesDescription("IC",
                                num_profiles=profiles_per_distribution,
@@ -73,7 +75,7 @@ def generate_preference_profiles(profiles_per_distribution, n, m):
                                args={"num_dimensions": 10, "space": "uniform_cube"}),
     ]
 
-    profiles = du.create_profiles(profiles_descriptions=profiles_descriptions)
+    profiles = du.create_profiles(profiles_descriptions=profiles_descriptions, seed=seed)
 
     return profiles
 
@@ -81,6 +83,13 @@ def generate_preference_profiles(profiles_per_distribution, n, m):
 def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_type="utilitarian",
                        rule_type="positional", **annealing_args):
     # Generate setting used by annealing process: evaluation function, profiles, utilities
+    if "seed" in annealing_args:
+        seed = annealing_args["seed"]
+    else:
+        seed = None
+    np.random.seed(seed)
+    random.seed(seed)
+
     eval_func = get_utility_eval_func_from_str(util_type)
     profiles = generate_preference_profiles(profiles_per_distribution=profiles_per_dist, n=n_voters, m=n_candidates)
     utilities = [du._utilities_from_profile(profile) for profile in profiles]
@@ -111,18 +120,32 @@ def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_
     else:
         num_history_updates = min(100, n_steps)
 
-    rule = optr.PositionalScoringRule(profiles,
-                                      eval_func=eval_func,
-                                      m=n_candidates,
-                                      k=None,
-                                      initial_state=initial_state,
-                                      utilities=utilities,
-                                      profile_score_aggregation_metric=profile_score_agg_metric,
-                                      keep_history=True,
-                                      history_path="../results/annealing_history",
-                                      job_name=job_name,
-                                      num_history_updates=num_history_updates
-                                      )
+    if rule_type == "positional":
+        rule = optr.PositionalScoringRule(profiles,
+                                          eval_func=eval_func,
+                                          m=n_candidates,
+                                          k=None,
+                                          initial_state=initial_state,
+                                          utilities=utilities,
+                                          profile_score_aggregation_metric=profile_score_agg_metric,
+                                          keep_history=True,
+                                          history_path="../results/annealing_history",
+                                          job_name=job_name,
+                                          num_history_updates=num_history_updates
+                                          )
+    elif rule_type == "C2":
+        rule = optr.C2ScoringRule(profiles=profiles,
+                                  eval_func=eval_func,
+                                  m=n_candidates,
+                                  k=None,
+                                  initial_state=initial_state,
+                                  utilities=utilities,
+                                  profile_score_aggregation_metric=profile_score_agg_metric,
+                                  keep_history=True,
+                                  history_path="../results/annealing_history",
+                                  job_name=job_name,
+                                  num_history_updates=num_history_updates
+                                  )
 
     result = rule.optimize(n_steps=n_steps)
     vector = result["state"]
@@ -130,73 +153,12 @@ def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_
         print(f"Current Energy: {rule.history['current_energy'][-1]}")
         print(f"Best Energy: {rule.history['best_energy'][-1]}")
 
-
     if initial_state is None and n_steps == 0:
         vector = rule.state
     elif n_steps == 0:
         vector = initial_state
     mean_sw = rule.rule_score()
     return mean_sw, vector
-    # rule = OptimizableSequentialScoringRule(profiles,
-    #                                         eval_func,
-    #                                         m,
-    #                                         utilities=utilities,
-    #                                         initial_state=initial_state,
-    #                                         profile_score_aggregation_metric=profile_score_agg_metric,
-    #                                         changes_per_step=1,
-    #                                         track_score=True,
-    #                                         )
-    if n_steps > 0:
-        # {
-        #     "state": vector,
-        #     "best_energy": sw,
-        #     "best_energy_history": self.best_energy_history,
-        #     "current_energy_history": self.best_energy_history,
-        # }
-
-        result = rule.optimize(n_steps=n_steps)
-        vector = result["state"]
-        if rule.history is not None:
-            print(f"Current Energy: {rule.history['current_energy'][-1]}")
-            print(f"Best Energy: {rule.history['best_energy'][-1]}")
-    if initial_state is None and n_steps == 0:
-        vector = rule.state
-    elif n_steps == 0:
-        vector = initial_state
-    mean_sw = rule.rule_score()
-    return mean_sw, vector
-
-    # Find utility on some hand-constructed score vectors as comparison
-    # TODO: Move out of this method, use as a starting state for this method and set n_steps to zero.
-    pre_built_vectors = vu.score_vector_examples(n_candidates)
-    for vec_name, starting_state in pre_built_vectors.items():
-        print(f"Beginning Sequential Rule for: {vec_name}")
-        starting_state = vu.normalize_score_vector(starting_state)
-        mean_sw, _ = _optimize_and_report_score(
-            profiles=profiles,
-            utilities=utilities,
-            eval_func=eval_func,
-            profile_score_agg_metric=np.mean,
-            m=n_candidates,
-            n_steps=0,
-            initial_state=starting_state
-        )
-
-        best_results[vec_name] = (mean_sw, starting_state)
-
-        # Use simulated annealing to find several scoring vectors that do well
-        all_annealing_outcomes = []
-        for _ in range(annealing_runs):
-            mean_sw, vector = _optimize_and_report_score(
-                profiles=profiles,
-                utilities=utilities,
-                eval_func=eval_func,
-                profile_score_agg_metric=np.mean,
-                m=n_candidates,
-                n_steps=annealing_steps,
-                initial_state=None
-            )
-            all_annealing_outcomes.append((mean_sw, vector))
 
 
 def optimize_utilities_tmp(util_type="utilitarian", annealing_steps=500, annealing_runs=5, n_candidates=10, n_voters=99,
@@ -357,75 +319,96 @@ def optimize_utilities_tmp(util_type="utilitarian", annealing_steps=500, anneali
 
 
 if __name__ == "__main__":
-    annealing_steps = 1000
+    annealing_steps = 2000
     # annealing_runs = 3
-    n_voters = 49
+    n_voters = 10
     n_candidates = 10
-    profiles_per_dist = 20
+    profiles_per_dist = 30
 
-    util_type = "egalitarian"
+    seed = 0
+
+    util_type = "malfare"
 
     pre_built_vectors = vu.score_vector_examples(n_candidates)
-    # for vec_name, starting_state in pre_built_vectors.items():
-    #     print(f"Beginning PSR Rule for: {vec_name}")
-    #     starting_state = vu.normalize_score_vector(starting_state)
-    #
-    #     optimize_utilities(n_candidates=n_candidates,
-    #                        n_voters=n_voters,
-    #                        profiles_per_dist=profiles_per_dist,
-    #                        util_type=util_type,
-    #                        rule_type="positional",
-    #                        initial_state=starting_state,
-    #                        profile_score_agg_metric=np.mean,
-    #                        job_name=f"util_measurement-initial_state={vec_name}-utility={util_type}",
-    #                        n_steps=0
-    #                        )
+    for vec_name, starting_state in pre_built_vectors.items():
+        # print(f"Beginning PSR Rule for: {vec_name}")
+        starting_state = vu.normalize_score_vector(starting_state)
+
+        mean_sw, vector = optimize_utilities(n_candidates=n_candidates,
+                                             n_voters=n_voters,
+                                             profiles_per_dist=profiles_per_dist,
+                                             util_type=util_type,
+                                             rule_type="positional",
+                                             initial_state=starting_state,
+                                             profile_score_agg_metric=np.mean,
+                                             job_name=f"util_measurement-initial_state={vec_name}-utility={util_type}",
+                                             n_steps=0,
+                                             seed=seed
+                                             )
+        print(f"{vec_name} - energy: {mean_sw}")
+
+    # print(f"Testing C2 as Borda")
+    mean_sw, vector = optimize_utilities(n_candidates=n_candidates,
+                                         n_voters=n_voters,
+                                         profiles_per_dist=profiles_per_dist,
+                                         util_type=util_type,
+                                         rule_type="C2",
+                                         initial_state=[1, 0],
+                                         profile_score_agg_metric=np.mean,
+                                         job_name=f"util_measurement-annealing-utility={util_type}",
+                                         n_steps=0,
+                                         num_history_updates=50,
+                                         verbose=True,
+                                         seed=seed
+                                         )
+    print(f"Borda C2 - energy: {mean_sw}")
+
+    # print(f"Testing C2 as Copeland")
+    mean_sw, vector = optimize_utilities(n_candidates=n_candidates,
+                                         n_voters=n_voters,
+                                         profiles_per_dist=profiles_per_dist,
+                                         util_type=util_type,
+                                         rule_type="C2",
+                                         initial_state=[0, 0.5],
+                                         profile_score_agg_metric=np.mean,
+                                         job_name=f"util_measurement-annealing-utility={util_type}",
+                                         n_steps=0,
+                                         num_history_updates=50,
+                                         verbose=True,
+                                         seed=seed
+                                         )
+    print(f"Copeland C2 - energy: {mean_sw}")
+
+    # print(f"Testing C2 between Borda and Copeland")
+    mean_sw, vector = optimize_utilities(n_candidates=n_candidates,
+                                         n_voters=n_voters,
+                                         profiles_per_dist=profiles_per_dist,
+                                         util_type=util_type,
+                                         rule_type="C2",
+                                         initial_state=[0.5, 0.5],
+                                         profile_score_agg_metric=np.mean,
+                                         job_name=f"util_measurement-annealing-utility={util_type}",
+                                         n_steps=0,
+                                         num_history_updates=50,
+                                         verbose=True,
+                                         seed=seed
+                                         )
+    print(f"Weirdo C2 - energy: {mean_sw}")
 
     # actually do optimization
-    print(f"Beginning PSR Optimization with Annealing")
+    print(f"Beginning C2 Optimization with Annealing")
     mean_sw, vector = optimize_utilities(n_candidates=n_candidates,
-                       n_voters=n_voters,
-                       profiles_per_dist=profiles_per_dist,
-                       util_type=util_type,
-                       rule_type="positional",
-                       initial_state=pre_built_vectors["half_approval_degrading"],
-                       profile_score_agg_metric=np.mean,
-                       # job_name=f"util_measurement-annealing-utility={util_type}",
-                       n_steps=annealing_steps,
-                       num_history_updates=10,
-                       verbose=True
-                       )
+                                         n_voters=n_voters,
+                                         profiles_per_dist=profiles_per_dist,
+                                         util_type=util_type,
+                                         rule_type="C2",
+                                         initial_state=[1, 0],
+                                         profile_score_agg_metric=np.mean,
+                                         job_name=f"util_measurement-annealing-utility={util_type}",
+                                         n_steps=annealing_steps,
+                                         num_history_updates=50,
+                                         verbose=True,
+                                         seed=seed
+                                         )
 
     print(f"Best vector is: {vector}")
-
-
-
-    # util_type = "nash"
-    # pre_built_vectors = vu.score_vector_examples(n_candidates)
-    # for vec_name, starting_state in pre_built_vectors.items():
-    #     print(f"Beginning Sequential Rule for: {vec_name}")
-    #     starting_state = vu.normalize_score_vector(starting_state)
-    #
-    #     optimize_utilities(n_candidates=n_candidates,
-    #                        n_voters=n_voters,
-    #                        profiles_per_dist=profiles_per_dist,
-    #                        util_type=util_type,
-    #                        rule_type="positional",
-    #                        initial_state=starting_state,
-    #                        profile_score_agg_metric=np.mean,
-    #                        job_name=f"util_measurement-initial_state={vec_name}-utility={util_type}",
-    #                        n_steps=0
-    #                        )
-    #
-    # # actually do optimization
-    # optimize_utilities(n_candidates=n_candidates,
-    #                    n_voters=n_voters,
-    #                    profiles_per_dist=profiles_per_dist,
-    #                    util_type=util_type,
-    #                    rule_type="positional",
-    #                    # initial_state=pre_built_vectors["half_approval_degrading"],
-    #                    profile_score_agg_metric=np.mean,
-    #                    job_name=f"util_measurement-annealing-utility={util_type}",
-    #                    n_steps=annealing_steps,
-    #                    num_history_updates=69
-    #                    )

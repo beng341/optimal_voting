@@ -1,6 +1,26 @@
 import numpy as np
 import pref_voting.profiles
-from . import data_utils
+import data_utils
+
+
+def weighted_tournament(profile):
+    """
+    Given a PrefVoting profile, return an ndarray WT representing the weighted tournament graph of the profile.
+    WT[i, j] contains the number of voters that prefer candidate i over candidate j.
+    :param profile:
+    :return:
+    """
+    wt = np.zeros((profile.num_cands, profile.num_cands))
+    for v, order in enumerate(profile._rankings):
+        for i_idx, i in enumerate(order):
+            for j_idx, j in enumerate(order):
+                if j_idx <= i_idx:
+                    continue    # only count when j is above i
+                if i_idx == len(order)-1:
+                    continue    # don't let i take highest value (redundant)
+                wt[i, j] += 1
+
+    return wt
 
 
 def social_welfare_for_alternative_single_profile(utilities, alternatives, type="utilitarian"):

@@ -1,6 +1,6 @@
 from simanneal import Annealer
-import data_utils
-import voting_utils
+import data_utils as du
+import voting_utils as vu
 from OptimizableRule import PositionalScoringRule, OptimizableRule
 
 
@@ -22,8 +22,11 @@ class ScoreVectorAnnealer(Annealer):
         # self.state = (self.state - min(self.state)) / max(self.state)
 
 
+
+
+
 if __name__ == "__main__":
-    profiles = data_utils.create_profiles({
+    profiles = du.create_profiles({
         "n_profiles": 50,
         "prefs_per_profile": 20,
         "m": 10,
@@ -33,10 +36,10 @@ if __name__ == "__main__":
         # "single_crossing"
     })
     profiles = [profile.rankings for profile in profiles]
-    utilities = [data_utils._utilities_from_profile(profile) for profile in profiles]
+    utilities = [du._utilities_from_profile(profile) for profile in profiles]
 
     optimizable_rule = PositionalScoringRule(profiles=profiles,
-                                             eval_func=voting_utils.utilitarian_social_welfare,
+                                             eval_func=vu.utilitarian_social_welfare,
                                              m=10,
                                              k=None,
                                              utilities=utilities,
