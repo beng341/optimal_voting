@@ -43,7 +43,7 @@ def social_welfare_for_alternative_single_profile(utilities, alternatives, type=
         sw = sum(utilities[:, alternative])
     elif type == "nash_welfare":
         # Keep a more scalable value by taking sum of logs rather than product
-        sw = sum(np.log(utilities[:, alternative]))
+        sw = sum(np.log(utilities[:, alternative] + 0.000001))
         # sw = np.prod(utilities[:, alternative])
     elif type == "egalitarian":
         sw = min(utilities[:, alternative])
@@ -73,6 +73,73 @@ def social_welfare_for_alternative_single_profile(utilities, alternatives, type=
     return sw
 
 
+def social_welfare_for_alternative_single_profile_torch(utilities, alternative, type="utilitarian"):
+    """
+    Given utility_type vectors and the index of an alternative, determine the social welfare (sum of utilities) for that
+    alternative being elected.
+    NOTE: Be sure to give this a single set of profiles rather than a list of many profiles as is often passed around.
+    :param utilities:
+    :param alternatives:
+    :return:
+    """
+    import torch
+    if isinstance(utilities, list):
+        utilities = np.array(utilities)
+
+    if type == "utilitarian":
+        sw = torch.sum(utilities[:, alternative])
+    elif type == "nash_welfare":
+        # Keep a more scalable value by taking sum of logs rather than product
+        sw = torch.sum(np.log(utilities[:, alternative]))
+        # sw = np.prod(utilities[:, alternative])
+    elif type == "egalitarian":
+        sw = torch.min(utilities[:, alternative])
+    elif type == "malfare":
+        sw = torch.max(utilities[:, alternative])
+    elif type == "distortion-utilitarian":
+        # find best possible utilitarian social welfare
+        m = len(utilities[0])
+        all_u_sws = [torch.sum(utilities[:, a]) for a in range(m)]
+        best_sw = torch.max(all_u_sws)
+        # return ratio of best utilitarian sw to actual utilitarian sw
+
+        # we're maximizing it so we should somehow invert the value
+        sw = 1/(best_sw / torch.sum(utilities[:, alternative]))
+    elif type == "distortion-egalitarian":
+        # find best possible egalitarian social welfare
+        m = len(utilities[0])
+        all_u_sws = [torch.min(utilities[:, a]) for a in range(m)]
+        best_sw = torch.max(all_u_sws)
+        # return ratio of best egalitarian sw to actual egalitarian sw
+
+        # we're maximizing it so we should somehow invert the value
+        sw = 1/(best_sw / torch.min(utilities[:, alternative]))
+    else:
+        sw = -1
+
+    return sw
+
+
+def score_vector_winner_tensor(score_vector, profile):
+    """
+    Return the winner of the positional scoring rule defined by the list of single number tensors in score_vector.
+    :param score_vector:
+    :param profile:
+    :return:
+    """
+    import torch
+
+    # full_score_vec = torch.atleast_2d(score_vector)
+    full_score_vec = torch.cat(score_vector).unsqueeze(0)
+
+    sorted_profiles = profile.argsort()
+    scores = torch.take_along_dim(full_score_vec, sorted_profiles, dim=1)
+    scores = torch.sum(scores, axis=0)
+
+    w = torch.argmax(scores)
+    return w
+
+
 def score_vector_winner(score_vector, profile, return_complete_results=False, randomize=False):
     """
 
@@ -89,6 +156,7 @@ def score_vector_winner(score_vector, profile, return_complete_results=False, ra
     if isinstance(profile, list):
         profile = np.asarray(profile)
 
+    full_score_vec_test = np.atleast_2d(score_vector)
     full_score_vec = np.atleast_2d(score_vector).repeat(repeats=len(profile), axis=0)
     sorted_profiles = profile.argsort()
     scores = np.take_along_axis(full_score_vec, sorted_profiles, axis=1)

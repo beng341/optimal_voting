@@ -50,6 +50,10 @@ class OptimizableRule(Annealer):
                                                            utility_type=utility_type))
             kwargs["utilities"] = utilities
 
+        if "optimization_method" not in kwargs:
+            kwargs["optimization_method"] = "annealing"
+        self.optimization_method = kwargs["optimization_method"]
+
         self.state = state
         # self.profiles = profiles
         self.evaluation_function = eval_func
@@ -141,7 +145,16 @@ class OptimizableRule(Annealer):
         self.steps = n_steps
 
         self.updates = n_steps  # call update function at every step; not always necessary
-        vector, sw = self.anneal()
+
+        if self.optimization_method == "annealing":
+            vector, sw = self.anneal()
+        elif self.optimization_method == "gradient_descent":
+            from optimal_voting.gradient_descent import gradient_descent
+            vector, sw = gradient_descent(profiles=self.profiles,
+                                          utilities=self.kwargs["utilities"],
+                                          initial_state=self.kwargs["initial_state"],
+                                          opt_target=self.kwargs["gd_opt_target"],
+                                          max_n_iterations=n_steps)
 
         self.post_optimization()
 
