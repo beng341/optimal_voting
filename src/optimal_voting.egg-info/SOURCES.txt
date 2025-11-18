@@ -8,6 +8,7 @@ src/optimal_voting/annealing_experiments.py
 src/optimal_voting/data_utils.py
 src/optimal_voting/evaluation.py
 src/optimal_voting/gradient_descent.py
+src/optimal_voting/mixed_integer_optimization.py
 src/optimal_voting/voting_utils.py
 src/optimal_voting.egg-info/PKG-INFO
 src/optimal_voting.egg-info/SOURCES.txt

@@ -29,7 +29,7 @@ def get_utility_eval_func_from_str(util_type):
 
 def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_type="utilitarian",
                        rule_type="positional", **annealing_args):
-    # Generate setting used by annealing process: evaluation function, profiles, utilities
+    # Generate setting used by annealing process: evaluation function, profiles, utility_profile
     if "seed" in annealing_args:
         seed = annealing_args["seed"]
     else:
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
     args = {
         "n_steps": optimization_steps,
-        "utilities": all_utilities,
+        "utility_profile": all_utilities,
         "optimization_method": "annealing",
         # "initial_state": [1.0] + [0.0 for _ in range(m-1)],
         "initial_state": [(m-i-1)/(m-i) for i in range(m)],
@@ -189,7 +189,7 @@ if __name__ == "__main__":
     #     # print(f"Beginning PSR Rule for: {vec_name}")
     #     starting_state = vu.normalize_score_vector(starting_state)
     #
-    #     mean_sw, vector = optimize_utilities(n_candidates=n_candidates,
+    #     mean_sw, score_vector = optimize_utilities(n_candidates=n_candidates,
     #                                          n_voters=n_voters,
     #                                          profiles_per_dist=profiles_per_dist,
     #                                          util_type=util_type,
@@ -203,7 +203,7 @@ if __name__ == "__main__":
     #     print(f"{vec_name} - energy: {mean_sw}")
 
     # # print(f"Testing C2 as Borda")
-    # mean_sw, vector = optimize_utilities(n_candidates=n_candidates,
+    # mean_sw, score_vector = optimize_utilities(n_candidates=n_candidates,
     #                                      n_voters=n_voters,
     #                                      profiles_per_dist=profiles_per_dist,
     #                                      util_type=util_type,
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     # print(f"Borda C2 - energy: {mean_sw}")
     #
     # # print(f"Testing C2 as Copeland")
-    # mean_sw, vector = optimize_utilities(n_candidates=n_candidates,
+    # mean_sw, score_vector = optimize_utilities(n_candidates=n_candidates,
     #                                      n_voters=n_voters,
     #                                      profiles_per_dist=profiles_per_dist,
     #                                      util_type=util_type,
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     # print(f"Copeland C2 - energy: {mean_sw}")
     #
     # # print(f"Testing C2 between Borda and Copeland")
-    # mean_sw, vector = optimize_utilities(n_candidates=n_candidates,
+    # mean_sw, score_vector = optimize_utilities(n_candidates=n_candidates,
     #                                      n_voters=n_voters,
     #                                      profiles_per_dist=profiles_per_dist,
     #                                      util_type=util_type,
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     #
     # # actually do optimization
     # print(f"Beginning C2 Optimization with Annealing")
-    # mean_sw, vector = optimize_utilities(n_candidates=n_candidates,
+    # mean_sw, score_vector = optimize_utilities(n_candidates=n_candidates,
     #                                      n_voters=n_voters,
     #                                      profiles_per_dist=profiles_per_dist,
     #                                      util_type=util_type,
@@ -266,4 +266,4 @@ if __name__ == "__main__":
     #                                      seed=seed
     #                                      )
     #
-    # print(f"Best vector is: {vector}")
+    # print(f"Best score_vector is: {score_vector}")

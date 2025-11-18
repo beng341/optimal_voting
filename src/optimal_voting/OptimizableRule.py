@@ -11,8 +11,8 @@ import time
 import sys
 from collections import defaultdict
 from simanneal import Annealer
-from optimal_voting.data_utils import utilities_from_profile
-from optimal_voting.voting_utils import normalize_score_vector, score_vector_winner, weighted_tournament
+from optimal_voting.data_utils import utilities_from_profile, weighted_tournament
+from optimal_voting.voting_utils import normalize_score_vector, score_vector_winner
 
 
 class OptimizableRule(Annealer):
@@ -35,10 +35,10 @@ class OptimizableRule(Annealer):
         if "verbose" in kwargs and kwargs["verbose"]:
             self.verbose = True
 
-        if "utilities" not in kwargs:
-            # generate utilities based on profile, default to linear values between 0 and 1
+        if "utility_profile" not in kwargs:
+            # generate utility_profile based on profile, default to linear values between 0 and 1
             if self.verbose:
-                print("Utilities not provided. Generating utilities consistent with profile.")
+                print("Utilities not provided. Generating utility_profile consistent with profile.")
             if "utility_type" in kwargs:
                 utility_type = kwargs["utility_type"]
             else:
@@ -48,7 +48,7 @@ class OptimizableRule(Annealer):
                 utilities.append(utilities_from_profile(profile,
                                                            normalize_utilities=True,
                                                            utility_type=utility_type))
-            kwargs["utilities"] = utilities
+            kwargs["utility_profile"] = utilities
 
         if "optimization_method" not in kwargs:
             kwargs["optimization_method"] = "annealing"
@@ -151,7 +151,7 @@ class OptimizableRule(Annealer):
         elif self.optimization_method == "gradient_descent":
             from optimal_voting.gradient_descent import gradient_descent
             vector, sw = gradient_descent(profiles=self.profiles,
-                                          utilities=self.kwargs["utilities"],
+                                          utilities=self.kwargs["utility_profile"],
                                           initial_state=self.kwargs["initial_state"],
                                           opt_target=self.kwargs["gd_opt_target"],
                                           max_n_iterations=n_steps)
@@ -233,8 +233,8 @@ class PositionalScoringRule(OptimizableRule):
         else:
             self.changes_per_step = 1
 
-        if "randomize" in kwargs:
-            self.randomized = kwargs["randomize"]
+        if "normalize" in kwargs:
+            self.randomized = kwargs["normalize"]
         else:
             self.randomized = False
 
@@ -311,7 +311,7 @@ def time_string(seconds):
 
 class RandomizedPositionalScoringRule(PositionalScoringRule):
     def __init__(self, profiles, eval_func, m, k=None, **kwargs):
-        kwargs["randomize"] = True
+        kwargs["normalize"] = True
         super().__init__(profiles, eval_func, m, k, **kwargs)
 
 
@@ -444,7 +444,7 @@ def _optimize_and_report_score(profiles, utilities, eval_func, profile_score_agg
     # rule = OptimizableSequentialScoringRule(profiles,
     #                                         eval_func,
     #                                         m,
-    #                                         utilities=utilities,
+    #                                         utility_profile=utility_profile,
     #                                         initial_state=initial_state,
     #                                         profile_score_aggregation_metric=profile_score_agg_metric,
     #                                         changes_per_step=1,
@@ -452,7 +452,7 @@ def _optimize_and_report_score(profiles, utilities, eval_func, profile_score_agg
     #                                         )
     if n_steps > 0:
         # {
-        #     "state": vector,
+        #     "state": score_vector,
         #     "best_energy": sw,
         #     "best_energy_history": self.best_energy_history,
         #     "current_energy_history": self.best_energy_history,

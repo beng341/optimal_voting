@@ -8,8 +8,8 @@ from optimal_voting.voting_utils import egalitarian_social_welfare, utilitarian_
 
 def social_welfare_for_alternative_single_profile_torch(utilities, alternative_weights, opt_type="utilitarian"):
     """
-    Take weight vector instead of a single alternative index in order to maintain gradient computations.
-    Returns weighted sum of utilities across all alternatives.
+    Take weight score_vector instead of a single alternative index in order to maintain gradient computations.
+    Returns weighted sum of utility_profile across all alternatives.
     """
     sw = None
     if opt_type == "utilitarian":
@@ -22,7 +22,7 @@ def social_welfare_for_alternative_single_profile_torch(utilities, alternative_w
         sw = torch.min(winner_util)
     elif opt_type == "malfare":
         prod = utilities * alternative_weights
-        winner_util, _ = torch.max(prod, dim=1)     # get utilities from just the column of the winner
+        winner_util, _ = torch.max(prod, dim=1)     # get utility_profile from just the column of the winner
         sw = torch.max(winner_util)     # utility of the best off voter
     return sw
 
@@ -130,7 +130,7 @@ def gradient_descent(profiles, utilities, initial_state, opt_target="egalitarian
         n_iterations += 1
 
     if verbose:
-        print(f"Best score vector from gradient descent is: {best_vector} with loss {best_loss}")
+        print(f"Best score score_vector from gradient descent is: {best_vector} with loss {best_loss}")
 
     return best_vector, best_loss
 

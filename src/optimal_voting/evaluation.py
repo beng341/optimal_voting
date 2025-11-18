@@ -8,8 +8,8 @@ import pandas as pd
 def evaluate_many_score_vectors_on_profiles(score_vectors, profiles, utilities, eval_func,
                                             aggregation_function=np.mean):
     """
-    Return a dict of score vector mapped to the aggregation of utilities (or, whatever eval_func does) for each
-    provided score vector across all profiles.
+    Return a dict of score score_vector mapped to the aggregation of utility_profile (or, whatever eval_func does) for each
+    provided score score_vector across all profiles.
     :param score_vectors:
     :param profiles:
     :param utilities:
@@ -101,8 +101,8 @@ def evaluate_score_vectors():
             profiles = du.create_profiles(profiles_descriptions=[prof_desc])
             utilities = [du._utilities_from_profile(profile) for profile in profiles]
 
-            # for each utility function, evaluate quality of each score vector
-            # get dict mapping a vector name to a mean social welfare for corresponding vector
+            # for each utility function, evaluate quality of each score score_vector
+            # get dict mapping a score_vector name to a mean social welfare for corresponding score_vector
             results = evaluate_many_score_vectors_on_profiles(score_vectors=vectors,
                                                               profiles=profiles,
                                                               utilities=utilities,
@@ -116,8 +116,8 @@ def evaluate_score_vectors():
             profiles = du.create_profiles(profiles_descriptions=profiles_descriptions)
             utilities = [du._utilities_from_profile(profile) for profile in profiles]
 
-            # for each utility function, evaluate quality of each score vector
-            # get dict mapping a vector name to a mean social welfare for corresponding vector
+            # for each utility function, evaluate quality of each score score_vector
+            # get dict mapping a score_vector name to a mean social welfare for corresponding score_vector
             results = evaluate_many_score_vectors_on_profiles(score_vectors=vectors,
                                                               profiles=profiles,
                                                               utilities=utilities,
