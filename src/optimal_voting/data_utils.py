@@ -52,6 +52,50 @@ def create_profiles(profiles_descriptions, seed=None):
     return profiles
 
 
+def preference_distribution_options():
+    """
+    Construct a dictionary mapping a string name for each available preference distribution to a dict containing two
+    keys: 'function' and 'args'. 'function' contains the actual function used to generate preferences from this
+    distribution. All preference distributions take in parameters 'n_profiles', 'n' (number of voters), 'm' (number
+    of candidates), and 'seed' (default value of None). Some distributions accept additional arguments but always
+    have default values for any additional arguments. 'args' is a list containing the string names of each optional
+    additional argument allowed by a distribution.
+    :return: a dictionary exposing the available options for preference distribution generation.
+    """
+
+    dists = {
+        "Impartial Culture": {
+            "function": make_impartial_culture_profiles,
+            "args": []
+        },
+        "Impartial Anonymous Culture": {
+            "function": make_impartial_anonymous_culture_profiles,
+            "args": []
+        },
+        "Single-Peaked (Walsh)": {
+            "function": make_sp_walsh_profiles,
+            "args": []
+        },
+        "Single-Peaked (Conitzer)": {
+            "function": make_sp_conitzer_profiles,
+            "args": []
+        },
+        "Single-Peaked (Circle)": {
+            "function": make_sp_circle_profiles,
+            "args": []
+        },
+        "Urn": {
+            "function": make_urn_profiles,
+            "args": ['alpha']
+        },
+        "Mallow's": {
+            "function": make_mallows_profiles,
+            "args": ['phi']
+        },
+    }
+    return dists
+
+
 def make_impartial_culture_profiles(n_profiles, n=10, m=10, seed=None):
     rng = random.Random(seed)
     profiles = [
@@ -98,6 +142,17 @@ def make_sp_circle_profiles(n_profiles, n=10, m=10, seed=None):
 
 
 def make_urn_profiles(n_profiles, n=10, m=10, alpha=None, seed=None):
+    """
+
+    :param n_profiles:
+    :param n:
+    :param m:
+    :param alpha: After sampling each individual order, return alpha*m! copies of that order into the urn. A value
+    of 0 corresponds to impartial culture, large values (near infinity) approach identity preferences. Default
+    value is a random amount aiming for a middle ground, which is resampled for each distinct profile.
+    :param seed:
+    :return:
+    """
     rng = random.Random(seed)
     profiles = [
         ps.ordinal.urn(num_voters=n, num_candidates=m,
@@ -110,11 +165,21 @@ def make_urn_profiles(n_profiles, n=10, m=10, alpha=None, seed=None):
 
 
 def make_mallows_profiles(n_profiles, n=10, m=10, phi=None, seed=None):
+    """
+
+    :param n_profiles:
+    :param n:
+    :param m:
+    :param phi: Mallow's phi parameter. Acceptable values range from 0 to 1 (inclusive). A value of 0 corresponds to
+    identity preferences and a value of 1 corresponds to impartial culture preferences.
+    :param seed:
+    :return:
+    """
     rng = random.Random(seed)
     profiles = [
         ps.ordinal.mallows(num_voters=n, num_candidates=m,
                            phi=phi if phi is not None else rng.uniform(0.001, 0.999),
-                           normalise_phi=False,     # disallowed for simplicity
+                           normalise_phi=False,  # disallowed for simplicity
                            impartial_central_vote=False,
                            seed=rng.randint(0, 100000))
         for _ in range(n_profiles)
@@ -452,22 +517,16 @@ def default_job_name(**kwargs):
 
 
 if __name__ == "__main__":
-    # m = 10
-    # save_profiles(profiles_per_dist=1, m=m)
-    # convert_rankings_to_utilities(m=m)
 
-    utilities = [
-        [1, 5, 3, 2, 8],
-        [1, 2, 3, 4, 5],
-        [5, 4, 3, 2, 6]
-    ]
-    profile = profile_from_utilies(utilities)
-    print(profile)
-    print(type(profile))
+    pref_dist_options = preference_distribution_options()
+    mallows = pref_dist_options["Mallow's"]
+    kwargs = {mallows["args"][0]: 0}
 
-    print("-------------------")
+    mallows_profiles = mallows["function"](n_profiles=5,
+                                                     n=10,
+                                                     m=10,
+                                                     **kwargs)
 
-    utilities = np.asarray(utilities)
-    profile = profile_from_utilies(utilities)
-    print(profile)
-    print(type(profile))
+    utility_profiles = [utilities_from_profile(prf, normalize_utilities=True) for prf in mallows_profiles]
+
+    print(f"Generated Mallow's profiles with phi = {kwargs['phi']}")
