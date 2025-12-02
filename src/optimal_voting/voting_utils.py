@@ -370,22 +370,9 @@ def score_vector_examples(m=5, normalize=False):
         "Three Approval": [1, 1, 1] + [0 for _ in range(m - 3)],
         "Geometric": [1 / (2 ** i) for i in range(m)],
         "Half-Approval": [1] + [0.9 if idx < m // 2 else 0 for idx in range(m - 1)],
-        "Half-Approval Degrading": [1] + [0.9 for _ in range(m // 2)] + [1 / (2 ** (idx + 1)) for idx in range(m // 2)] if m % 2 == 1 else [1] + [0.9 for _ in range(m // 2 - 1)] + [1 / (2 ** (idx + 1)) for idx in range(m // 2)]
+        "Half-Approval Degrading": [1] + [0.9 for _ in range(m // 2)] + [1 / (2 ** (idx + 1)) for idx in range(m // 2)] if m % 2 == 1 else [1] + [0.9 for _ in range(m // 2 - 1)] + [1 / (2 ** (idx + 1)) for idx in range(m // 2)],
+        # "optimal_scf_paper": [0.25, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1, 0]
     }
-    # plurality = [1] + [0 for _ in range(m - 1)]
-    # plurality_veto = [1] + [0 for _ in range(m - 2)] + [-1]
-    # veto = [0 for _ in range(m - 1)] + [-1]
-    # borda = [m - idx - 1 for idx in range(m)]
-    # squared_borda = [(m - idx - 1) ** 2 for idx in range(m)]
-    # cubed_borda = [(m - idx - 1) ** 3 for idx in range(m)]
-    # two_approval = [1, 1] + [0 for _ in range(m - 2)]
-    # half_approval = [1] + [0.9 if idx < m // 2 else 0 for idx in range(m - 1)]
-    # geometric_decreasing = [1 / (2 ** i) for i in range(m)]
-    # if m % 2 == 1:
-    #     half_approval_degrading = [1] + [0.9 for _ in range(m // 2)] + [1 / (2 ** (idx + 1)) for idx in range(m // 2)]
-    # else:
-    #     half_approval_degrading = [1] + [0.9 for _ in range(m // 2 - 1)] + [1 / (2 ** (idx + 1)) for idx in
-    #                                                                         range(m // 2)]
 
     if normalize:
         vectors = {name: normalize_score_vector(vector) for (name, vector) in vectors.items()}
@@ -394,9 +381,9 @@ def score_vector_examples(m=5, normalize=False):
 
 
 if __name__ == "__main__":
-    m = 5
-    n = 20
-    all_profiles = du.make_impartial_culture_profiles(n_profiles=10,
+    m = 8
+    n = 100
+    all_profiles = du.make_impartial_culture_profiles(n_profiles=1000,
                                                       n=n,
                                                       m=m)
     all_utilities = [du.utilities_from_profile(profile, normalize_utilities=True, utility_type="uniform_random") for
@@ -412,3 +399,4 @@ if __name__ == "__main__":
         print(f"SW for {vec_name} is {sw}")
         print(f"Vector is: {v}")
         print(f"Normalized vector is: {normalize_score_vector(v)}")
+        print()

@@ -233,8 +233,8 @@ class PositionalScoringRule(OptimizableRule):
         else:
             self.changes_per_step = 1
 
-        if "normalize" in kwargs:
-            self.randomized = kwargs["normalize"]
+        if "randomize" in kwargs:
+            self.randomized = kwargs["randomize"]
         else:
             self.randomized = False
 
@@ -311,7 +311,7 @@ def time_string(seconds):
 
 class RandomizedPositionalScoringRule(PositionalScoringRule):
     def __init__(self, profiles, eval_func, m, k=None, **kwargs):
-        kwargs["normalize"] = True
+        kwargs["randomize"] = True
         super().__init__(profiles, eval_func, m, k, **kwargs)
 
 
