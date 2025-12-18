@@ -5,7 +5,7 @@ import optimal_voting.data_utils as du
 
 
 def social_welfare_for_positional_score_vector_many_profiles(profiles, all_utilities, score_vector,
-                                                             sw_type="utilitarian", aggregation_method=np.mean):
+                                                             sw_type="utilitarian", aggregation_method=np.mean, normalize=False):
     """
     Determine the aggregate social welfare of a score_vector over many pref_profiles. For each profile, determine the winner
     of the positional scoring rule defined by score_vector, then calculate the social welfare of that alternative on the
@@ -20,18 +20,19 @@ def social_welfare_for_positional_score_vector_many_profiles(profiles, all_utili
      'nash_welfare', 'egalitarian', 'malfare', 'distortion-utilitarian', 'distortion-egalitarian'.
     :param aggregation_method: Method which accepts a list of floats and returns a single numeric value representing the
     aggregate social welfare across all pref_profiles.
+    :param normalize: If set to True, scale each utility result so that the best candidate possible would receive a utility of one and other values are reported relative to this.
     :return:
     """
 
     assert len(profiles) == len(all_utilities)
 
     individual_sws = [
-        social_welfare_for_positional_score_vector_single_profile(profiles[i], all_utilities[i], score_vector, sw_type)
+        social_welfare_for_positional_score_vector_single_profile(profiles[i], all_utilities[i], score_vector, sw_type, normalize)
         for i in range(len(profiles))]
     return aggregation_method(individual_sws)
 
 
-def social_welfare_for_positional_score_vector_single_profile(profile, utilities, score_vector, sw_type="utilitarian"):
+def social_welfare_for_positional_score_vector_single_profile(profile, utilities, score_vector, sw_type="utilitarian", normalize=False):
     """
     Determine the social welfare of the winner of the given score_vector. That is, determine the winner based on
     the positional scoring rule defined by score_vector on the provided profile. Then calculate the social welfare
@@ -47,12 +48,22 @@ def social_welfare_for_positional_score_vector_single_profile(profile, utilities
     position i by a voter should receive p points.
     :param sw_type: A string corresponding to a pre-defined social welfare function. Supported values are 'utilitarian',
      'nash_welfare', 'egalitarian', 'malfare', 'distortion-utilitarian', 'distortion-egalitarian'.
+    :param normalize: If set to True, scale each utility result so that the best candidate possible would receive a utility of one and other values are reported relative to this.
     :return:
     """
     # Get winner of score_vector
     winner = score_vector_winner(score_vector, profile, randomize=False)
     # get utility of winning alternative
-    return social_welfare_for_alternative_single_profile(utilities, winner, sw_type=sw_type)
+    sw = social_welfare_for_alternative_single_profile(utilities, winner, sw_type=sw_type)
+    if normalize:
+        # find utility of all candidates in order to scale result
+        all_sw = [social_welfare_for_alternative_single_profile(utilities, cand, sw_type=sw_type) for cand in range(len(score_vector))]
+        best_sw = max(all_sw)
+    else:
+        best_sw = 1
+
+    return sw / best_sw
+
 
 
 def social_welfare_for_alternative_many_profiles(utilities, alternatives, sw_type="utilitarian",
@@ -387,28 +398,6 @@ def score_vector_examples(m=5, normalize=True):
     return vectors
 
 
-if __name__ == "__main__":
-    m = 8
-    n = 100
-    all_profiles = du.make_impartial_culture_profiles(n_profiles=1000,
-                                                      n=n,
-                                                      m=m)
-    all_utilities = [du.utilities_from_profile(profile, normalize_utilities=True, utility_type="uniform_random") for
-                     profile in all_profiles]
-
-    example_vectors = score_vector_examples(m)
-
-    for vec_name, v in example_vectors.items():
-        sw = social_welfare_for_positional_score_vector_many_profiles(profiles=all_profiles,
-                                                                      all_utilities=all_utilities,
-                                                                      score_vector=v,
-                                                                      sw_type="egalitarian")
-        print(f"SW for {vec_name} is {sw}")
-        print(f"Vector is: {v}")
-        print(f"Normalized vector is: {normalize_score_vector(v)}")
-        print()
-
-
 def get_utility_eval_func_from_str(util_type):
     if util_type == "utilitarian":
         eval_func = utilitarian_social_welfare
@@ -425,3 +414,26 @@ def get_utility_eval_func_from_str(util_type):
     else:
         raise ValueError("Didn't make other eval functions yet")
     return eval_func
+
+
+if __name__ == "__main__":
+    m = 10
+    n = 100
+    all_profiles = du.make_impartial_culture_profiles(n_profiles=1000,
+                                                      n=n,
+                                                      m=m)
+    all_utilities = [du.utilities_from_profile(profile, normalize_utilities=False, utility_type="linear") for
+                     profile in all_profiles]
+
+    example_vectors = score_vector_examples(m)
+
+    for vec_name, v in example_vectors.items():
+        sw = social_welfare_for_positional_score_vector_many_profiles(profiles=all_profiles,
+                                                                      all_utilities=all_utilities,
+                                                                      score_vector=v,
+                                                                      sw_type="nash",
+                                                                      normalize=True)
+        print(f"SW for {vec_name} is {sw}")
+        print(f"Vector is: {v}")
+        print(f"Normalized vector is: {normalize_score_vector(v)}")
+        print()
