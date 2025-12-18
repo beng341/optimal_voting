@@ -9,7 +9,7 @@ def evaluate_many_score_vectors_on_profiles(score_vectors, profiles, utilities, 
                                             aggregation_function=np.mean):
     """
     Return a dict of score score_vector mapped to the aggregation of utility_profile (or, whatever eval_func does) for each
-    provided score score_vector across all profiles.
+    provided score score_vector across all pref_profiles.
     :param score_vectors:
     :param profiles:
     :param utilities:
@@ -97,7 +97,7 @@ def evaluate_score_vectors():
         all_rows = []
         for prof_desc in profiles_descriptions:
 
-            # create new profiles for each different pref distribution
+            # create new pref_profiles for each different pref distribution
             profiles = du.create_profiles(profiles_descriptions=[prof_desc])
             utilities = [du._utilities_from_profile(profile) for profile in profiles]
 
@@ -112,7 +112,7 @@ def evaluate_score_vectors():
             all_rows.append(new_row)
         else:
             # Also test with each profile distribution together
-            # create new profiles for each different pref distribution
+            # create new pref_profiles for each different pref distribution
             profiles = du.create_profiles(profiles_descriptions=profiles_descriptions)
             utilities = [du._utilities_from_profile(profile) for profile in profiles]
 

@@ -5,7 +5,7 @@ from optimal_voting.data_utils import utilities_from_profile, make_mixed_prefere
 
 def _optimize_score_vector_mip_experimental(social_welfare_lists, rank_matrices):
     """
-    Optimize a single score score_vector to maximize mean social welfare across multiple profiles.
+    Optimize a single score score_vector to maximize mean social welfare across multiple pref_profiles.
     # TODO: Does it make sense to maximize median social welfare?
 
     Args:
@@ -17,7 +17,7 @@ def _optimize_score_vector_mip_experimental(social_welfare_lists, rank_matrices)
 
     Returns:
         model: the optimized MIP model
-        score_vector: the optimal score score_vector variable list (single, shared across profiles)
+        score_vector: the optimal score score_vector variable list (single, shared across pref_profiles)
         winners_list: list of binary winner variables for each profile
     """
     n_profiles = len(social_welfare_lists)
@@ -27,7 +27,7 @@ def _optimize_score_vector_mip_experimental(social_welfare_lists, rank_matrices)
     # Create model
     model = Model("multi_profile_score_vector_optimization")
 
-    # Variables - ONE score score_vector shared across all profiles
+    # Variables - ONE score score_vector shared across all pref_profiles
     score_vector = [model.add_var(var_type=CONTINUOUS, lb=0, ub=1,
                                   name=f'score_{j}') for j in range(m)]
 
@@ -48,13 +48,13 @@ def _optimize_score_vector_mip_experimental(social_welfare_lists, rank_matrices)
               for p in range(n_profiles)]
     epsilon = 0.001
 
-    # Objective: Maximize mean sw across all profiles
+    # Objective: Maximize mean sw across all pref_profiles
     total_sw = xsum(social_welfare_lists[p][i] * winners_list[p][i]
                          for p in range(n_profiles)
                          for i in range(n_cands))
     model.objective = maximize(total_sw / n_profiles)
 
-    # Constraints on score_vector (shared across all profiles)
+    # Constraints on score_vector (shared across all pref_profiles)
     model += score_vector[0] == 1, "top_rank_score"
     model += score_vector[m - 1] == 0, "bottom_rank_score"
 
@@ -100,7 +100,7 @@ def _optimize_score_vector_mip_experimental(social_welfare_lists, rank_matrices)
 
 def _optimize_score_vector_mip(social_welfare_lists, rank_matrices):
     """
-    Optimize a single score score_vector to maximize mean social welfare across multiple profiles.
+    Optimize a single score score_vector to maximize mean social welfare across multiple pref_profiles.
     # TODO: Does it make sense to maximize median social welfare?
 
     Args:
@@ -112,7 +112,7 @@ def _optimize_score_vector_mip(social_welfare_lists, rank_matrices):
 
     Returns:
         model: the optimized MIP model
-        score_vector: the optimal score score_vector variable list (single, shared across profiles)
+        score_vector: the optimal score score_vector variable list (single, shared across pref_profiles)
         winners_list: list of binary winner variables for each profile
     """
     n_profiles = len(social_welfare_lists)
@@ -122,7 +122,7 @@ def _optimize_score_vector_mip(social_welfare_lists, rank_matrices):
     # Create model
     model = Model("multi_profile_score_vector_optimization")
 
-    # Variables - ONE score score_vector shared across all profiles
+    # Variables - ONE score score_vector shared across all pref_profiles
     score_vector = [model.add_var(var_type=CONTINUOUS, lb=0, ub=1,
                                   name=f'score_{j}') for j in range(m)]
 
@@ -143,13 +143,13 @@ def _optimize_score_vector_mip(social_welfare_lists, rank_matrices):
               for p in range(n_profiles)]
     epsilon = 0.001
 
-    # Objective: Maximize mean sw across all profiles
+    # Objective: Maximize mean sw across all pref_profiles
     total_sw = xsum(social_welfare_lists[p][i] * winners_list[p][i]
                          for p in range(n_profiles)
                          for i in range(n_cands))
     model.objective = maximize(total_sw / n_profiles)
 
-    # Constraints on score_vector (shared across all profiles)
+    # Constraints on score_vector (shared across all pref_profiles)
     model += score_vector[0] == 1, "top_rank_score"
     model += score_vector[m - 1] == 0, "bottom_rank_score"
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     n = 5
     m = 5
 
-    # 1. Generate some profiles and their corresponding utility_profile
+    # 1. Generate some pref_profiles and their corresponding utility_profile
     profiles = make_mixed_preference_profiles(profiles_per_distribution=profiles_per_dist,
                                               n=n,
                                               m=m,
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     utilities_for_profiles = [utilities_from_profile(profile, normalize_utilities=False, utility_type="uniform_random") for profile in profiles]
 
 
-    # profiles = [
+    # pref_profiles = [
     #     [
     #         (0, 1, 2, 3, 4),
     #         (0, 1, 3, 2, 4),
@@ -256,7 +256,7 @@ if __name__ == "__main__":
     #         [0, 0.25, 0.5, 0.75, 1],
     #     ]
     # ]
-    # utilities_for_profiles = [utilities_from_profile(profile, normalize_utilities=False, utility_type="uniform_random") for profile in profiles]
+    # utilities_for_profiles = [utilities_from_profile(profile, normalize_utilities=False, utility_type="uniform_random") for profile in pref_profiles]
 
 
     # 2. For whatever SW function, find the SW of each candidate winning across each profile

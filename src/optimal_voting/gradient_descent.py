@@ -49,11 +49,11 @@ def gradient_descent(profiles, utilities, initial_state, opt_target="egalitarian
 
     """
 
-    profiles = [torch.tensor(profile._rankings, dtype=int) for profile in profiles]
+    profiles = [torch.tensor(profile, dtype=int) for profile in profiles]
     utilities = torch.as_tensor(utilities)
 
     m = len(profiles[0][0])
-    # n = len(profiles[0])
+    # n = len(pref_profiles[0])
     # initial_vector = [torch.tensor([(m-1-i)/(m-1)], requires_grad=True) for i in range(m)]  # start at Borda
     # initial_vector = [torch.tensor([1.0], requires_grad=True)] + [torch.tensor([0.0], requires_grad=True) for i in range(m-1)]    # Plurality
     initial_vector = [torch.tensor([initial_state[i]], requires_grad=True) for i in range(m)]
@@ -151,7 +151,7 @@ if __name__ == "__main__":
                                                  seed=seed)
 
     utilities = [du.utilities_from_profile(profile) for profile in profiles]
-    # profiles = [torch.tensor(profile._rankings, dtype=int) for profile in profiles]
+    # pref_profiles = [torch.tensor(profile._rankings, dtype=int) for profile in pref_profiles]
     initial_state = [(m-1-i)/(m-1) for i in range(m)]
 
     gradient_descent(profiles,

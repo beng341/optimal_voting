@@ -11,53 +11,89 @@ import time
 import sys
 from collections import defaultdict
 from simanneal import Annealer
-from optimal_voting.data_utils import utilities_from_profile, weighted_tournament
-from optimal_voting.voting_utils import normalize_score_vector, score_vector_winner
+from optimal_voting.data_utils import utilities_from_profile, weighted_tournament, profile_from_utilies
+# from optimal_voting.voting_utils import normalize_score_vector, score_vector_winner, get_utility_eval_func_from_str, score_vector_scores
+import optimal_voting.voting_utils as vu
 
 
 class OptimizableRule(Annealer):
 
-    def __init__(self, state, profiles, eval_func, **kwargs):
+    def __init__(self, state, eval_func, **kwargs):
         """
 
         :param state:
-        :param profiles:
+        :param pref_profiles:
         """
         super().__init__(initial_state=state)
-        self.profiles = []
-        for profile in profiles:
-            if not isinstance(profile, pref_voting.profiles.Profile):
-                self.profiles.append(pref_voting.profiles.Profile(profile))
-            else:
-                self.profiles.append(profile)
+        self.verbose = kwargs.get("verbose", False)
 
-        self.verbose = False
-        if "verbose" in kwargs and kwargs["verbose"]:
-            self.verbose = True
+        ################################################################################
+        #   Set up preferences and voter identities for whatever preference format was given
+        ################################################################################
+        self.vmap = dict()  # maps external voter id to internal id (0-indexed and consecutive)
+        self.cmap = dict()  # maps external candidate id to internal id (0-indexed and consecutive)
 
-        if "utility_profile" not in kwargs:
-            # generate utility_profile based on profile, default to linear values between 0 and 1
+        self.pref_profiles = []
+        self.utility_profiles = []
+
+        ################################################################################
+        #   Set up items related to running the optimization and storing results
+        ################################################################################
+
+        self.parse_preference_profiles(kwargs)
+        self.parse_utility_profiles(kwargs)
+
+        assert len(self.pref_profiles) > 0 or len(self.utility_profiles) > 0, "Must provide at least one of ordinal or cardinal data."
+
+        # ensure both profile formats exist
+        if len(self.utility_profiles) == 0:
             if self.verbose:
                 print("Utilities not provided. Generating utility_profile consistent with profile.")
-            if "utility_type" in kwargs:
-                utility_type = kwargs["utility_type"]
-            else:
-                utility_type = "linear"
-            utilities = []
-            for profile in profiles:
-                utilities.append(utilities_from_profile(profile,
-                                                           normalize_utilities=True,
-                                                           utility_type=utility_type))
-            kwargs["utility_profile"] = utilities
+            for pref_profile in self.pref_profiles:
+                self.utility_profiles.append(utilities_from_profile(pref_profile,
+                                           normalize_utilities=kwargs.get("normalize_utilities", True),
+                                           utility_type=kwargs.get("utility_type", "linear")))
+        if len(self.pref_profiles) == 0:
+            if self.verbose:
+                print("Utilities not provided. Generating utility_profile consistent with profile.")
+            for util_profile in self.utility_profiles:
+                self.pref_profiles.append(profile_from_utilies(util_profile))
 
+        # how many winners to compute per profile
+        if "num_winners" in kwargs:
+            if isinstance(kwargs["num_winners"], int):
+                self.num_winners = [kwargs["num_winners"]] * len(self.pref_profiles)
+            elif isinstance(kwargs["num_winners"], list):
+                self.num_winners = kwargs["num_winners"]
+            else:
+                raise ValueError("num_winners must be int or list")
+        else:
+            self.num_winners = [1] * len(self.pref_profiles)
+
+        # if voter weights given as a dict, use mapping to convert to list
+        if kwargs["voter_weights"] is not None:
+            if isinstance(kwargs["voter_weights"], dict):
+                vw = [1 for _ in range(len(kwargs["voter_weights"]))]
+                for external_name, internal_name in self.vmap.items():
+                    vw[internal_name] = kwargs["voter_weights"][external_name]
+                kwargs["voter_weights"] = vw
+
+        ################################################################################
+        #   Set up items related to running optimization and storing results
+        ################################################################################
         if "optimization_method" not in kwargs:
             kwargs["optimization_method"] = "annealing"
         self.optimization_method = kwargs["optimization_method"]
 
-        self.state = state
-        # self.profiles = profiles
-        self.evaluation_function = eval_func
         self.kwargs = kwargs
+        self.kwargs["utility_profiles"] = self.utility_profiles
+        self.kwargs["pref_profiles"] = self.pref_profiles
+
+        self.state = state
+        if isinstance(eval_func, str):
+            self.evaluation_function = vu.get_utility_eval_func_from_str(eval_func)
+        else:
+            self.evaluation_function = eval_func
 
         if "job_name" in kwargs:
             self.job_name = kwargs["job_name"]
@@ -97,6 +133,91 @@ class OptimizableRule(Annealer):
         else:
             self.history_path = None
 
+    def parse_preference_profiles(self, kwargs):
+        """
+        Extract preference profiles from kwargs given during rule creation, if they exist.
+        Accepts two formats of preference data, all profiles must be in at most one format. If not given, utility
+        profiles must be given and preferences will later be generated based on provided utility data.
+        :param kwargs:
+        :return:
+        """
+
+        assert ("pref_profile_lists" not in kwargs) or ("pref_profile_dicts" not in kwargs), "Must provide only one format of preference data"
+
+        if "pref_profile_lists" in kwargs:
+            assert len(kwargs["pref_profile_lists"]) > 0, "Cannot pass empty pref_profiles argument"
+            # Voter and candidate labels require no mapping; set up default maps
+            n_voters_max = 0
+            n_cands = 0
+            for profile in kwargs["pref_profile_lists"]:
+                self.pref_profiles.append(profile)
+
+                n_voters_max = max(len(self.pref_profiles[-1]), n_voters_max)
+                n_cands = len(self.pref_profiles[0])
+            self.vmap = {i: i for i in range(n_voters_max)}
+            self.cmap = {i: i for i in range(n_cands)}
+
+        if "pref_profile_dicts" in kwargs:
+            # Each profile is a dict of dicts where each voter id is mapped to each candidate id is mapped to rank
+            for profile in kwargs["pref_profile_dicts"]:
+                util_vals = []
+                for voter_id, voter_ranks in profile.items():
+                    if voter_id not in self.vmap:
+                        self.vmap[voter_id] = len(self.vmap)
+
+                    pref_order = []
+                    for cand_id, rank in voter_ranks.items():
+                        if cand_id not in self.cmap:
+                            self.cmap[cand_id] = len(self.cmap)
+
+                        pref_order[rank] = self.cmap[cand_id]
+                    util_vals.append(pref_order)
+
+                # TODO: do we really need to use pref_voting Profile objects?
+                self.pref_profiles.append(util_vals)
+
+    def parse_utility_profiles(self, kwargs):
+        """
+        Extract utility profiles from kwargs given during rule creation, if they exist.
+        Accepts two formats of utility data, all profiles must be in at most one format. If not given, preference
+        profiles must be given and these will later be generated based on provided preference data.
+        :param kwargs:
+        :return:
+        """
+
+        assert ("utility_profile_lists" not in kwargs) or (
+                    "utility_profile_dicts" not in kwargs), "Must provide only one format of utility data"
+
+        if "utility_profile_lists" in kwargs:
+            assert len(kwargs["utility_profile_lists"]) > 0, "Cannot pass empty utility profiles"
+            # Voter and candidate labels require no mapping; set up default maps
+            n_voters_max = 0
+            n_cands = 0
+            for profile in kwargs["utility_profile_lists"]:
+                # list of lists where profile[i][j] = c indicates voter i gets c utility if j is elected
+                self.utility_profiles.append(profile)
+                n_voters_max = max(len(self.utility_profiles[-1]), n_voters_max)
+                n_cands = len(self.utility_profiles[0])
+            self.vmap = {i: i for i in range(n_voters_max)}
+            self.cmap = {i: i for i in range(n_cands)}
+
+        if "utility_profile_dicts" in kwargs:
+            # Each profile is a dict of dicts where each voter id is mapped to each candidate id is mapped to rank
+            for profile in kwargs["utility_profile_dicts"]:
+                util_vals = []
+                for voter_id, voter_utils in profile.items():
+                    if voter_id not in self.vmap:
+                        self.vmap[voter_id] = len(self.vmap)
+
+                    pref_order = [0 for _ in range(len(voter_utils))]
+                    for cand_id, util in voter_utils.items():
+                        if cand_id not in self.cmap:
+                            self.cmap[cand_id] = len(self.cmap)
+                        pref_order[self.cmap[cand_id]] = util
+                    util_vals.append(pref_order)
+
+                self.utility_profiles.append(util_vals)
+
     @abstractmethod
     def move(self):
         pass
@@ -104,8 +225,8 @@ class OptimizableRule(Annealer):
     @abstractmethod
     def rule_winners(self):
         """
-        Evaluate the current rule on all profiles. Return a list with one entry per profile, in order according to
-        profiles list.
+        Evaluate the current rule on all pref_profiles. Return a list with one entry per profile, in order according to
+        pref_profiles list.
         Each entry in returned list should be an iterable of tied winners. Typically this should be length one but
         we prefer to not lose generality at this stage. Also applicable to multi-winner settings.
         :return:
@@ -114,10 +235,10 @@ class OptimizableRule(Annealer):
 
     def rule_score(self):
         """
-        Calculate some aggregate score metric over all profiles. Run the evaluation function provided during rule
+        Calculate some aggregate score metric over all pref_profiles. Run the evaluation function provided during rule
         setup for the winner(s) of each profile. Calculate the aggregate score over all resulting evaluation values.
         If no aggregation function is provided during rule setup, default to using mean.
-        If calculating utility, this might then report the mean utility over all profiles for the current winner on
+        If calculating utility, this might then report the mean utility over all pref_profiles for the current winner on
         each profile.
         :return:
         """
@@ -128,10 +249,7 @@ class OptimizableRule(Annealer):
 
         all_winners = self.rule_winners()
         all_scores = [self.evaluation_function(idx, winners, profile, **self.kwargs) for idx, (winners, profile) in
-                      enumerate(zip(all_winners, self.profiles))]
-
-        # all_scores = [self.evaluation_function(idx, self.state, profile, **self.kwargs) for idx, profile in
-        #               enumerate(self.profiles)]
+                      enumerate(zip(all_winners, self.pref_profiles))]
         return agg_metric(all_scores)
 
     def energy(self):
@@ -150,19 +268,31 @@ class OptimizableRule(Annealer):
             vector, sw = self.anneal()
         elif self.optimization_method == "gradient_descent":
             from optimal_voting.gradient_descent import gradient_descent
-            vector, sw = gradient_descent(profiles=self.profiles,
-                                          utilities=self.kwargs["utility_profile"],
+            vector, sw = gradient_descent(profiles=self.pref_profiles,
+                                          utilities=self.kwargs["utility_profiles"],
                                           initial_state=self.kwargs["initial_state"],
                                           opt_target=self.kwargs["gd_opt_target"],
                                           max_n_iterations=n_steps)
 
         self.post_optimization()
-
-        return {
+        results_dict = {
             "state": vector,
             "best_energy": sw,
-            "history": self.history
+            "history": self.history,
+            "voter_map": self.vmap,
+            "candidate_map": self.cmap
         }
+
+        if "return_candidate_scores" in self.kwargs and self.kwargs["return_candidate_scores"]:
+            cs = [
+                vu.score_vector_scores(vector, profile,
+                                       normalize=False,
+                                       voter_weights=self.kwargs.get("voter_weights", None))
+                for profile in self.pref_profiles
+            ]
+            results_dict["candidate_scores"] = cs
+
+        return results_dict
 
     def post_optimization(self):
         """
@@ -212,46 +342,32 @@ class OptimizableRule(Annealer):
 
 class PositionalScoringRule(OptimizableRule):
 
-    def __init__(self, profiles, eval_func, m, k=None, **kwargs):
+    def __init__(self, eval_func, m, k=None, **kwargs):
         """
 
-        :param profiles: A collection of lists corresponding to each voter's ranking of alternatives.
-        :param eval_func: A function which accepts profiles and states, and returns something akin to a score.
+        :param pref_profiles: A collection of lists corresponding to each voter's ranking of alternatives.
+        :param eval_func: A function which accepts preference profiles and states, and some
+        numeric measure of quality for the given states.
         :param m: Total number of alternatives
         :param k: Number of alternatives ranked by each voter. If None, all voters rank all alternatives.
         :param kwargs: May contain items relevant to scoring. E.g. social welfare function, axioms to avoid violating...
         """
-        assert len(profiles) > 0
+        # assert len(pref_profiles) > 0
 
         if k is None:
             k = m
         self.m = m
         self.k = k
 
-        if "changes_per_step" in kwargs:
-            self.changes_per_step = kwargs["changes_per_step"]
+        if "updates_per_step" in kwargs:
+            self.updates_per_step = kwargs["updates_per_step"]
         else:
-            self.changes_per_step = 1
+            self.updates_per_step = 1
 
         if "randomize" in kwargs:
             self.randomized = kwargs["randomize"]
         else:
             self.randomized = False
-
-        if "rankings_required" in kwargs:
-            self.rankings_required = kwargs["rankings_required"]
-        else:
-            self.rankings_required = False
-
-        if "num_winners" in kwargs:
-            if isinstance(kwargs["num_winners"], int):
-                self.num_winners = [kwargs["num_winners"]] * len(profiles)
-            elif isinstance(kwargs["num_winners"], list):
-                self.num_winners = kwargs["num_winners"]
-            else:
-                raise ValueError("num_winners must be int or list")
-        else:
-            self.num_winners = [1] * len(profiles)
 
         if "initial_state" in kwargs and kwargs["initial_state"] is not None:
             state = kwargs["initial_state"]
@@ -260,14 +376,15 @@ class PositionalScoringRule(OptimizableRule):
         else:
             # Start from Borda
             state = np.asarray([k - i - 1 for i in range(k)], dtype=float)
-        # normalize initial state
-        state = normalize_score_vector(state)
 
-        super().__init__(state=state, profiles=profiles, eval_func=eval_func, **kwargs)
+        # normalize initial state
+        state = vu.normalize_score_vector(state)
+
+        super().__init__(state=state, eval_func=eval_func, **kwargs)
 
     def move(self):
 
-        indices = random.sample(range(self.k-1), self.changes_per_step)
+        indices = random.sample(range(self.k-1), self.updates_per_step)
         for index in indices:
             # index = random.randint(0, self.m - 1)
             # sign = -1 if bool(random.getrandbits(1)) else 1
@@ -284,19 +401,17 @@ class PositionalScoringRule(OptimizableRule):
             # TODO: Add some sort of learning rate to affect size of steps
             self.state[index] += amount
 
-            self.state = normalize_score_vector(self.state)
+            self.state = vu.normalize_score_vector(self.state)
 
     def rule_winners(self):
-        # Get the output of the rule, as defined by the current state, on each of the profiles
+        # Get the output of the rule, as defined by the current state, on each of the pref_profiles
         if all(nw == 1 for nw in self.num_winners):
-            winners = [(score_vector_winner(self.state, profile, randomize=self.randomized),) for profile in
-                       self.profiles]
+            winners = [(vu.score_vector_winner(self.state, profile, randomize=self.randomized),) for profile in
+                       self.pref_profiles]
         else:
-            winners = [tuple(score_vector_winner(self.state, profile,
-                                                 randomize=self.randomized,
-                                                 return_complete_results=True)[:self.num_winners[prof_idx]])
+            winners = [tuple(vu.score_vector_ranking(self.state, profile)[:self.num_winners[prof_idx]])
                        for prof_idx, profile in
-                       enumerate(self.profiles)]
+                       enumerate(self.pref_profiles)]
 
         return winners
 
@@ -310,13 +425,13 @@ def time_string(seconds):
 
 
 class RandomizedPositionalScoringRule(PositionalScoringRule):
-    def __init__(self, profiles, eval_func, m, k=None, **kwargs):
+    def __init__(self, pref_profiles, eval_func, m, k=None, **kwargs):
         kwargs["randomize"] = True
-        super().__init__(profiles, eval_func, m, k, **kwargs)
+        super().__init__(pref_profiles, eval_func, m, k, **kwargs)
 
 
 class OptimizableSequentialScoringRule(OptimizableRule):
-    def __init__(self, profiles, eval_func, m, **kwargs):
+    def __init__(self, pref_profiles, eval_func, m, **kwargs):
         import sys
         import os
         sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -329,11 +444,6 @@ class OptimizableSequentialScoringRule(OptimizableRule):
         else:
             self.changes_per_step = 1
 
-        if "rankings_required" in kwargs:
-            self.rankings_required = kwargs["rankings_required"]
-        else:
-            self.rankings_required = False
-
         if "initial_state" in kwargs and kwargs["initial_state"] is not None:
             state = kwargs["initial_state"]
             if isinstance(state, list):
@@ -342,11 +452,11 @@ class OptimizableSequentialScoringRule(OptimizableRule):
             # Start from Borda
             state = np.asarray([m - i - 1 for i in range(m)], dtype=float)
         # normalize initial state
-        state = normalize_score_vector(state)
+        state = vu.normalize_score_vector(state)
 
         self.rule = ssr(score_vector=state, track_winners=False, track_losers=True, tie_break_func=None, verbose=False)
 
-        super().__init__(state=state, profiles=profiles, eval_func=eval_func, **kwargs)
+        super().__init__(state=state, pref_profiles=pref_profiles, eval_func=eval_func, **kwargs)
 
     def move(self):
 
@@ -359,19 +469,19 @@ class OptimizableSequentialScoringRule(OptimizableRule):
 
             # TODO: Add some sort of learning rate to affect size of steps
             self.state[index] += amount
-            self.state = normalize_score_vector(self.state)
+            self.state = vu.normalize_score_vector(self.state)
             self.rule.score_vector = self.state
 
     def rule_winners(self):
-        # Get the output of the rule, as defined by the current state, on each of the profiles
-        winners = [(self.rule.winner(profile),) for profile in self.profiles]
+        # Get the output of the rule, as defined by the current state, on each of the pref_profiles
+        winners = [(self.rule.winner(profile),) for profile in self.pref_profiles]
 
         return winners
 
 
 class OptimizableThieleRule(OptimizableRule):
 
-    def __init__(self, n_alternatives, n_winners, profiles, eval_func, **kwargs):
+    def __init__(self, n_alternatives, n_winners, pref_profiles, eval_func, **kwargs):
 
         self.n_alternatives = n_alternatives
         self.n_winners = n_winners
@@ -389,10 +499,10 @@ class OptimizableThieleRule(OptimizableRule):
             state = [1] + [0] * (n_winners-1)
             state = np.asarray(state)
 
-        if not all(isinstance(prof, abcvoting.preferences.Profile) for prof in profiles): #"approval_profiles" in kwargs:
+        if not all(isinstance(prof, abcvoting.preferences.Profile) for prof in pref_profiles): #"approval_profiles" in kwargs:
             raise ValueError("Current implementation requires passing abc_profile instead of ordinal preferences")
 
-        super().__init__(state, profiles, eval_func, **kwargs)
+        super().__init__(state, pref_profiles, eval_func, **kwargs)
 
     def move(self):
         current_losers = (~self.state.astype(bool)).nonzero()[0]
@@ -441,7 +551,7 @@ def _optimize_and_report_score(profiles, utilities, eval_func, profile_score_agg
                                  history_path="../results/annealing_history",
                                  job_name="psr_annealing"
                                  )
-    # rule = OptimizableSequentialScoringRule(profiles,
+    # rule = OptimizableSequentialScoringRule(pref_profiles,
     #                                         eval_func,
     #                                         m,
     #                                         utility_profile=utility_profile,
@@ -473,11 +583,11 @@ def _optimize_and_report_score(profiles, utilities, eval_func, profile_score_agg
 
 class C2ScoringRule(OptimizableRule):
 
-    def __init__(self, profiles, eval_func, **kwargs):
+    def __init__(self, pref_profiles, eval_func, **kwargs):
 
         profiles_clean = []
         self.margin_matrices = []
-        for profile in profiles:
+        for profile in pref_profiles:
             if not isinstance(profile, pref_voting.profiles.Profile):
                 profiles_clean.append(pref_voting.profiles.Profile(profile))
             else:
@@ -495,7 +605,7 @@ class C2ScoringRule(OptimizableRule):
             state = np.asarray([1, 0], dtype=float)
 
         super().__init__(state=state,
-                         profiles=profiles_clean,
+                         pref_profiles=profiles_clean,
                          eval_func=eval_func,
                          **kwargs)
 

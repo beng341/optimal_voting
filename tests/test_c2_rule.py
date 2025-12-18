@@ -15,8 +15,8 @@ def sample_profiles():
     return [prof1]
 
 def test_c2_is_borda(sample_profiles):
-    # profiles = sample_profiles
-    rule = C2ScoringRule(profiles=sample_profiles,
+    # pref_profiles = sample_profiles
+    rule = C2ScoringRule(pref_profiles=sample_profiles,
                          eval_func="utilitarian")
     assert 1 == 1
 

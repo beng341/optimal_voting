@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: optimal-voting
-Version: 0.0.5
+Version: 0.0.7
 Summary: Functionality to optimize different classes of voting rules for user-defined goals.
 Author-email: Ben Armstrong <research@benarmstrong.ca>
 License: MIT License
@@ -26,7 +26,7 @@ License: MIT License
         SOFTWARE.
 Project-URL: Repository, https://github.com/beng341/optimal_voting
 Keywords: social choice,voting,optimization,scoring rule
-Requires-Python: >=3.11
+Requires-Python: >=3.9.6
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: requests>=2.25.0

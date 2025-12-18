@@ -2,34 +2,14 @@ import random
 
 import data_utils as du
 import voting_utils as vu
-import pandas as pd
 import numpy as np
-from OptimizableRule import _optimize_and_report_score
 import OptimizableRule as optr
-from optimal_voting.OptimizableRule import OptimizableRule, PositionalScoringRule
-
-
-def get_utility_eval_func_from_str(util_type):
-    if util_type == "utilitarian":
-        eval_func = vu.utilitarian_social_welfare
-    elif util_type == "egalitarian":
-        eval_func = vu.egalitarian_social_welfare
-    elif util_type == "nash":
-        eval_func = vu.nash_social_welfare
-    elif util_type == "malfare":
-        eval_func = vu.malfare_social_welfare
-    elif util_type == "utilitarian_distortion":
-        eval_func = vu.utilitarian_distortion
-    elif util_type == "egalitarian_distortion":
-        eval_func = vu.egalitarian_distortion
-    else:
-        raise ValueError("Didn't make other eval functions yet")
-    return eval_func
+from optimal_voting.OptimizableRule import PositionalScoringRule
 
 
 def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_type="utilitarian",
                        rule_type="positional", **annealing_args):
-    # Generate setting used by annealing process: evaluation function, profiles, utility_profile
+    # Generate setting used by annealing process: evaluation function, pref_profiles, utility_profile
     if "seed" in annealing_args:
         seed = annealing_args["seed"]
     else:
@@ -37,7 +17,7 @@ def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_
     np.random.seed(seed)
     random.seed(seed)
 
-    eval_func = get_utility_eval_func_from_str(util_type)
+    eval_func = vu.get_utility_eval_func_from_str(util_type)
     profiles = du.make_mixed_preference_profiles(profiles_per_distribution=profiles_per_dist, n=n_voters,
                                                  m=n_candidates)
     utilities = [du.utilities_from_profile(profile) for profile in profiles]
@@ -69,8 +49,7 @@ def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_
         num_history_updates = min(100, n_steps)
 
     if rule_type == "positional":
-        rule = optr.PositionalScoringRule(profiles,
-                                          eval_func=eval_func,
+        rule = optr.PositionalScoringRule(eval_func=eval_func,
                                           m=n_candidates,
                                           k=None,
                                           initial_state=initial_state,
@@ -79,10 +58,11 @@ def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_
                                           keep_history=True,
                                           history_path="../results/annealing_history",
                                           job_name=job_name,
-                                          num_history_updates=num_history_updates
+                                          num_history_updates=num_history_updates,
+                                          pref_profile_lists=profiles
                                           )
     elif rule_type == "C2":
-        rule = optr.C2ScoringRule(profiles=profiles,
+        rule = optr.C2ScoringRule(pref_profiles=profiles,
                                   eval_func=eval_func,
                                   m=n_candidates,
                                   k=None,
@@ -110,7 +90,7 @@ def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_
 
 
 if __name__ == "__main__":
-    optimization_steps = 200
+    optimization_steps = 10
     # annealing_runs = 3
     n = 10
     m = 10
@@ -120,22 +100,33 @@ if __name__ == "__main__":
 
     util_type = "malfare"
 
-    all_profiles = vu.make_mixed_preference_profiles(profiles_per_distribution=profiles_per_dist,
-                                                     n=n,
-                                                     m=m)
-    all_utilities = [vu.utilities_from_profile(profile, normalize_utilities=True, utility_type="uniform_random") for
+    all_profiles = du.make_impartial_culture_profiles(n_profiles=profiles_per_dist,
+                                                      n=n, m=m, seed=seed)
+    all_utilities = [du.utilities_from_profile(profile, normalize_utilities=True, utility_type="uniform_random") for
                      profile in all_profiles]
+    candidates = random.sample(range(100000), m)
+    voters = random.sample(range(100000), m)
+    all_utilities_dicts = [
+        {
+            v: {c: random.randint(0, 10000) for c in candidates}
+            for v in voters
+        }
+        for _ in range(profiles_per_dist)   # one for each profile
+    ]
 
     args = {
         "n_steps": optimization_steps,
-        "utility_profile": all_utilities,
+        # "utility_profile_lists": all_utilities,
+        # "pref_profile_lists": all_profiles,
+        "utility_profile_dicts": all_utilities_dicts,
         "optimization_method": "annealing",
         # "initial_state": [1.0] + [0.0 for _ in range(m-1)],
         "initial_state": [(m-i-1)/(m-i) for i in range(m)],
-        "gd_opt_target": util_type
+        "gd_opt_target": util_type,
+        "return_candidate_scores": True
     }
-    annealing = PositionalScoringRule(profiles=all_profiles,
-                                      eval_func=get_utility_eval_func_from_str(util_type),
+    annealing = PositionalScoringRule(
+                                      eval_func=vu.get_utility_eval_func_from_str(util_type),
                                       m=m,
                                       **args
                                       )
@@ -143,15 +134,15 @@ if __name__ == "__main__":
     anneal_dict = annealing.optimize(n_steps=optimization_steps)
     print(f"Annealing vector is: {anneal_dict['state']} with loss {anneal_dict['best_energy']}")
 
-    args["optimization_method"] = "gradient_descent"
-    gradient_descender = PositionalScoringRule(profiles=all_profiles,
-                                               eval_func=get_utility_eval_func_from_str(util_type),
-                                               m=m,
-                                               **args
-                                               )
-
-    gd_dict = gradient_descender.optimize(n_steps=optimization_steps)
-    print(f"GD vector is: {gd_dict['state']} with loss {gd_dict['best_energy']}")
+    # args["optimization_method"] = "gradient_descent"
+    # gradient_descender = PositionalScoringRule(
+    #                                   eval_func=vu.get_utility_eval_func_from_str(util_type),
+    #                                   m=m,
+    #                                   **args
+    #                                   )
+    #
+    # gd_dict = gradient_descender.optimize(n_steps=optimization_steps)
+    # print(f"GD vector is: {gd_dict['state']} with loss {gd_dict['best_energy']}")
 
     anneal_sw, _ = optimize_utilities(n_candidates=m,
                                          n_voters=n,
@@ -165,105 +156,19 @@ if __name__ == "__main__":
                                          seed=seed
                                          )
 
-    gd_sw, _ = optimize_utilities(n_candidates=m,
-                                         n_voters=n,
-                                         profiles_per_dist=profiles_per_dist,
-                                         util_type=util_type,
-                                         rule_type="positional",
-                                         initial_state=gd_dict['state'],
-                                         profile_score_agg_metric=np.mean,
-                                         # job_name=f"util_measurement-initial_state={vec_name}-utility={util_type}",
-                                         n_steps=0,
-                                         seed=seed
-                                         )
+    # gd_sw, _ = optimize_utilities(n_candidates=m,
+    #                                      n_voters=n,
+    #                                      profiles_per_dist=profiles_per_dist,
+    #                                      util_type=util_type,
+    #                                      rule_type="positional",
+    #                                      initial_state=gd_dict['state'],
+    #                                      profile_score_agg_metric=np.mean,
+    #                                      # job_name=f"util_measurement-initial_state={vec_name}-utility={util_type}",
+    #                                      n_steps=0,
+    #                                      seed=seed
+    #                                      )
 
     print("\n===================\n")
 
     print(f"Validation test on anneal vector gives {anneal_sw} utility.")
-    print(f"Validation test on gradient descent vector gives {gd_sw} utility.")
-
-
-
-    # pre_built_vectors = vu.score_vector_examples(n_candidates)
-    # for vec_name, starting_state in pre_built_vectors.items():
-    #     # print(f"Beginning PSR Rule for: {vec_name}")
-    #     starting_state = vu.normalize_score_vector(starting_state)
-    #
-    #     mean_sw, score_vector = optimize_utilities(n_candidates=n_candidates,
-    #                                          n_voters=n_voters,
-    #                                          profiles_per_dist=profiles_per_dist,
-    #                                          util_type=util_type,
-    #                                          rule_type="positional",
-    #                                          initial_state=starting_state,
-    #                                          profile_score_agg_metric=np.mean,
-    #                                          job_name=f"util_measurement-initial_state={vec_name}-utility={util_type}",
-    #                                          n_steps=0,
-    #                                          seed=seed
-    #                                          )
-    #     print(f"{vec_name} - energy: {mean_sw}")
-
-    # # print(f"Testing C2 as Borda")
-    # mean_sw, score_vector = optimize_utilities(n_candidates=n_candidates,
-    #                                      n_voters=n_voters,
-    #                                      profiles_per_dist=profiles_per_dist,
-    #                                      util_type=util_type,
-    #                                      rule_type="C2",
-    #                                      initial_state=[1, 0],
-    #                                      profile_score_agg_metric=np.mean,
-    #                                      job_name=f"util_measurement-annealing-utility={util_type}",
-    #                                      n_steps=0,
-    #                                      num_history_updates=50,
-    #                                      verbose=True,
-    #                                      seed=seed
-    #                                      )
-    # print(f"Borda C2 - energy: {mean_sw}")
-    #
-    # # print(f"Testing C2 as Copeland")
-    # mean_sw, score_vector = optimize_utilities(n_candidates=n_candidates,
-    #                                      n_voters=n_voters,
-    #                                      profiles_per_dist=profiles_per_dist,
-    #                                      util_type=util_type,
-    #                                      rule_type="C2",
-    #                                      initial_state=[0, 0.5],
-    #                                      profile_score_agg_metric=np.mean,
-    #                                      job_name=f"util_measurement-annealing-utility={util_type}",
-    #                                      n_steps=0,
-    #                                      num_history_updates=50,
-    #                                      verbose=True,
-    #                                      seed=seed
-    #                                      )
-    # print(f"Copeland C2 - energy: {mean_sw}")
-    #
-    # # print(f"Testing C2 between Borda and Copeland")
-    # mean_sw, score_vector = optimize_utilities(n_candidates=n_candidates,
-    #                                      n_voters=n_voters,
-    #                                      profiles_per_dist=profiles_per_dist,
-    #                                      util_type=util_type,
-    #                                      rule_type="C2",
-    #                                      initial_state=[0.5, 0.5],
-    #                                      profile_score_agg_metric=np.mean,
-    #                                      job_name=f"util_measurement-annealing-utility={util_type}",
-    #                                      n_steps=0,
-    #                                      num_history_updates=50,
-    #                                      verbose=True,
-    #                                      seed=seed
-    #                                      )
-    # print(f"Weirdo C2 - energy: {mean_sw}")
-    #
-    # # actually do optimization
-    # print(f"Beginning C2 Optimization with Annealing")
-    # mean_sw, score_vector = optimize_utilities(n_candidates=n_candidates,
-    #                                      n_voters=n_voters,
-    #                                      profiles_per_dist=profiles_per_dist,
-    #                                      util_type=util_type,
-    #                                      rule_type="C2",
-    #                                      initial_state=[1, 0],
-    #                                      profile_score_agg_metric=np.mean,
-    #                                      job_name=f"util_measurement-annealing-utility={util_type}",
-    #                                      n_steps=optimization_steps,
-    #                                      num_history_updates=50,
-    #                                      verbose=True,
-    #                                      seed=seed
-    #                                      )
-    #
-    # print(f"Best score_vector is: {score_vector}")
+    # print(f"Validation test on gradient descent vector gives {gd_sw} utility.")

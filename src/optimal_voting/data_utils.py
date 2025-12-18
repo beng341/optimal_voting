@@ -23,16 +23,16 @@ ProfilesDescription = namedtuple("ProfilesDescription",
 
 def create_profiles(profiles_descriptions, seed=None):
     """
-    Given a description of the desired profiles create a list where each entry contains a single profile.
+    Given a description of the desired pref_profiles create a list where each entry contains a single profile.
     :param profiles_descriptions: list of ProfilesDescription namedtuple containing all the parameters required
     to generate each sw_type of profile.
     :param seed: Value for random number generator. Due to how we interface with prefsampling this is actually used as
     a seed for rng to generate an actual seed within this method, rather than being passed directly to prefsampling.
-    :return: list of profiles (each of which is a list of lists of integers)
+    :return: list of pref_profiles (each of which is a list of lists of integers)
     """
 
     profiles = []
-    rng = random.Random(seed)  # passing seed directly appears to result in all profiles always being identical
+    rng = random.Random(seed)  # passing seed directly appears to result in all pref_profiles always being identical
     for prof in profiles_descriptions:
         for _ in range(prof.num_profiles):
             if prof.args is None:
@@ -47,7 +47,7 @@ def create_profiles(profiles_descriptions, seed=None):
                                **args)
             # rankings = profile.rankings
             profiles += [prof.rankings for prof in profile]
-            # profiles.append(profile.rankings)
+            # pref_profiles.append(profile.rankings)
 
     return profiles
 
@@ -323,7 +323,7 @@ def save_profiles(profiles, out_folder="data", filename=None):
 
     # # convert the individual rankings to lists rather than tuples to match format of existing data
     # final_profiles = []
-    # for prf in profiles:
+    # for prf in pref_profiles:
     #     new_profile = []
     #     for rnk in prf:
     #         new_profile.append(list(rnk))
@@ -422,7 +422,7 @@ def rank_matrix(profile):
         profile = profile.rankings
     m = len(profile[0])  # length of first preference order in profile, assume for now all orders are complete
 
-    # for profiles in profiles:
+    # for pref_profiles in pref_profiles:
     rank_matrix = np.zeros((m, m), dtype=np.int64)
     for order in profile:
         for idx, c in enumerate(order):
@@ -453,62 +453,6 @@ def weighted_tournament(profile):
     return wt
 
 
-# def add_utilities_to_saved_profile(out_folder="data", voters_per_profile=50, num_profiles=100, m=5, preference_models="all", utility_noise=True):
-#     """
-#
-#     :return:
-#     """
-#     filename = f"{out_folder}/profile_data-m={m}-preference_models={preference_models}-utility_noise={utility_noise}-voters_per_profile={voters_per_profile}-num_profiles={num_profiles}.csv"
-#     df = pd.read_csv(filename)
-#     profiles = df["profile"].tolist()
-#     all_utilities = []
-#     for profile in profiles:
-#         profile = eval(profile)
-#         utilities = utilities_from_profile(profile)
-#         all_utilities.append(utilities)
-#     df["utility_profile"] = all_utilities
-#
-#     df.to_csv(filename)
-
-
-# def load_profiles(out_folder="data", **kwargs):
-#     df = load_or_make_data(out_folder=out_folder, **kwargs)
-#     profiles = df["profile"].tolist()
-#     all_profiles = []
-#     for profile in profiles:
-#         prf = eval(profile)
-#         all_profiles.append(prf)
-#     return all_profiles
-
-
-# def load_or_make_data(out_folder="data", **kwargs):
-#     """
-#
-#     # :param m:
-#     # :param data_path:
-#     # :param preference_models:
-#     # :param num_profiles:
-#     # :param voters_per_profile:
-#     :return:
-#     """
-#     if not data_exists(**kwargs):
-#
-#         save_profiles(**kwargs)
-#         add_utilities_to_saved_profile(**kwargs)
-#
-#     filename = f"{out_folder}/profile_data-m={kwargs['m']}-preference_models={kwargs['preference_models']}-utility_noise={kwargs['utility_noise']}-voters_per_profile={kwargs['voters_per_profile']}-num_profiles={kwargs['num_profiles']}.csv"
-#     return pd.read_csv(filename)
-
-
-# def data_exists(out_folder="data", **kwargs):
-#     """
-#     Assume that if the file exists it has the right columns inside it.
-#     :return:
-#     """
-#     filename = f"{out_folder}/profile_data-m={kwargs['m']}-preference_models={kwargs['preference_models']}-utility_noise={kwargs['utility_noise']}-voters_per_profile={kwargs['voters_per_profile']}-num_profiles={kwargs['num_profiles']}.csv"
-#     return os.path.exists(filename)
-
-
 def default_job_name(**kwargs):
     terms_in_name = ["profile_score_agg_metric", "n_steps"]
     job_name = "annealing-"
@@ -529,4 +473,4 @@ if __name__ == "__main__":
 
     utility_profiles = [utilities_from_profile(prf, normalize_utilities=True) for prf in mallows_profiles]
 
-    print(f"Generated Mallow's profiles with phi = {kwargs['phi']}")
+    print(f"Generated Mallow's pref_profiles with phi = {kwargs['phi']}")
