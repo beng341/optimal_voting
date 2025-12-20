@@ -24,7 +24,6 @@ class OptimizableRule(Annealer):
         :param state:
         :param pref_profiles:
         """
-        super().__init__(initial_state=state)
         self.verbose = kwargs.get("verbose", False)
 
         ################################################################################
@@ -71,12 +70,13 @@ class OptimizableRule(Annealer):
             self.num_winners = [1] * len(self.pref_profiles)
 
         # if voter weights given as a dict, use mapping to convert to list
-        if kwargs["voter_weights"] is not None:
+        if "voter_weights" in kwargs and kwargs["voter_weights"] is not None:
             if isinstance(kwargs["voter_weights"], dict):
                 vw = [1 for _ in range(len(kwargs["voter_weights"]))]
                 for external_name, internal_name in self.vmap.items():
                     vw[internal_name] = kwargs["voter_weights"][external_name]
                 kwargs["voter_weights"] = vw
+
 
         ################################################################################
         #   Set up items related to running optimization and storing results
@@ -132,6 +132,18 @@ class OptimizableRule(Annealer):
                 self.history_path = self.kwargs["history_path"]
         else:
             self.history_path = None
+
+        try:
+            super().__init__(initial_state=state)
+        except ValueError as e:
+            # If signal.signal fails (not in main thread), manually initialize
+            # temp workaround until a better annealer is created
+            if "signal only works in main thread" in str(e):
+                # Manually do what Annealer.__init__ does without the signal
+                self.state = self.copy_state(state)
+                self.user_exit = False
+            else:
+                raise
 
     def parse_preference_profiles(self, kwargs):
         """

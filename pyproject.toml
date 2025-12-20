@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "optimal-voting"
-version = "0.0.7"
+version = "0.0.8"
 description = "Functionality to optimize different classes of voting rules for user-defined goals."
 authors = [{name = "Ben Armstrong", email = "research@benarmstrong.ca"}]
 license = {file = "LICENSE"}

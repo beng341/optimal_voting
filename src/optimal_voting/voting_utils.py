@@ -287,6 +287,8 @@ def score_vector_scores(score_vector, profile, normalize=False, voter_weights=No
     if voter_weights is not None:
         if isinstance(voter_weights, list):
             voter_weights = np.array(voter_weights)
+    else:
+        voter_weights = np.ones(len(profile))
 
     full_score_vec = np.atleast_2d(score_vector).repeat(repeats=len(profile), axis=0)
     full_score_vec = full_score_vec * voter_weights[:, None]

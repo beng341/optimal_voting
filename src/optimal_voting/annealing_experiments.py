@@ -90,7 +90,7 @@ def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_
 
 
 if __name__ == "__main__":
-    optimization_steps = 10
+    optimization_steps = 100
     # annealing_runs = 3
     n = 10
     m = 10
@@ -122,8 +122,9 @@ if __name__ == "__main__":
         "optimization_method": "annealing",
         # "initial_state": [1.0] + [0.0 for _ in range(m-1)],
         "initial_state": [(m-i-1)/(m-i) for i in range(m)],
-        "gd_opt_target": util_type,
-        "return_candidate_scores": True
+        # "gd_opt_target": util_type,
+        "return_candidate_scores": True,
+        "verbose": True
     }
     annealing = PositionalScoringRule(
                                       eval_func=vu.get_utility_eval_func_from_str(util_type),
