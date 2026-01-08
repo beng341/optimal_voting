@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: optimal-voting
-Version: 0.0.7
+Version: 0.1.0
 Summary: Functionality to optimize different classes of voting rules for user-defined goals.
 Author-email: Ben Armstrong <research@benarmstrong.ca>
 License: MIT License
