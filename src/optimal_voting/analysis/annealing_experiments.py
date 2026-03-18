@@ -4,7 +4,6 @@ import data_utils as du
 import voting_utils as vu
 import numpy as np
 import OptimizableRule as optr
-from optimal_voting.OptimizableRule import PositionalScoringRule
 
 
 def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_type="utilitarian",
@@ -56,7 +55,7 @@ def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_
                                           utilities=utilities,
                                           profile_score_aggregation_metric=profile_score_agg_metric,
                                           keep_history=True,
-                                          history_path="../results/annealing_history",
+                                          history_path="../../results/annealing_history",
                                           job_name=job_name,
                                           num_history_updates=num_history_updates,
                                           pref_profile_lists=profiles
@@ -70,7 +69,7 @@ def optimize_utilities(n_candidates=10, n_voters=99, profiles_per_dist=30, util_
                                   utilities=utilities,
                                   profile_score_aggregation_metric=profile_score_agg_metric,
                                   keep_history=True,
-                                  history_path="../results/annealing_history",
+                                  history_path="../../results/annealing_history",
                                   job_name=job_name,
                                   num_history_updates=num_history_updates
                                   )
@@ -126,7 +125,7 @@ if __name__ == "__main__":
         "return_candidate_scores": True,
         "verbose": True
     }
-    annealing = PositionalScoringRule(
+    annealing = optr.PositionalScoringRule(
                                       eval_func=vu.get_utility_eval_func_from_str(util_type),
                                       m=m,
                                       **args

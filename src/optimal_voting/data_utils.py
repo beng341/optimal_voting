@@ -10,47 +10,6 @@ from scipy.stats import gamma
 from pref_voting.generate_profiles import generate_profile as gen_prof
 from collections import namedtuple
 
-ProfilesDescription = namedtuple("ProfilesDescription",
-                                 [
-                                     "distribution",
-                                     "num_profiles",
-                                     "num_voters",
-                                     "num_candidates",
-                                     "args"
-                                 ]
-                                 )
-
-
-def create_profiles(profiles_descriptions, seed=None):
-    """
-    Given a description of the desired pref_profiles create a list where each entry contains a single profile.
-    :param profiles_descriptions: list of ProfilesDescription namedtuple containing all the parameters required
-    to generate each sw_type of profile.
-    :param seed: Value for random number generator. Due to how we interface with prefsampling this is actually used as
-    a seed for rng to generate an actual seed within this method, rather than being passed directly to prefsampling.
-    :return: list of pref_profiles (each of which is a list of lists of integers)
-    """
-
-    profiles = []
-    rng = random.Random(seed)  # passing seed directly appears to result in all pref_profiles always being identical
-    for prof in profiles_descriptions:
-        for _ in range(prof.num_profiles):
-            if prof.args is None:
-                args = {}
-            else:
-                args = prof.args
-            args["seed"] = rng.randint(0, 1000000)
-            profile = gen_prof(num_voters=prof.num_voters,
-                               num_candidates=prof.num_candidates,
-                               probmodel=prof.distribution,
-                               num_profiles=prof.num_profiles,
-                               **args)
-            # rankings = profile.rankings
-            profiles += [prof.rankings for prof in profile]
-            # pref_profiles.append(profile.rankings)
-
-    return profiles
-
 
 def preference_distribution_options():
     """
@@ -187,126 +146,6 @@ def make_mallows_profiles(n_profiles, n=10, m=10, phi=None, seed=None):
     return profiles
 
 
-def make_mixed_preference_profiles(profiles_per_distribution=100, n=10, m=10, seed=None):
-    profiles_descriptions = [
-        ProfilesDescription("IC",
-                            num_profiles=profiles_per_distribution,
-                            num_voters=n,
-                            num_candidates=m,
-                            args=None),
-        ProfilesDescription("single_peaked_conitzer",
-                            num_profiles=profiles_per_distribution,
-                            num_voters=n,
-                            num_candidates=m,
-                            args=None),
-        ProfilesDescription("single_peaked_walsh",
-                            num_profiles=profiles_per_distribution,
-                            num_voters=n,
-                            num_candidates=m,
-                            args=None),
-        ProfilesDescription("MALLOWS-RELPHI-R",
-                            num_profiles=profiles_per_distribution,
-                            num_voters=n,
-                            num_candidates=m,
-                            args=None),
-        ProfilesDescription("URN-R",
-                            num_profiles=profiles_per_distribution,
-                            num_voters=n,
-                            num_candidates=m,
-                            args=None),
-        ProfilesDescription("euclidean",
-                            num_profiles=profiles_per_distribution,
-                            num_voters=n,
-                            num_candidates=m,
-                            args={"num_dimensions": 3, "space": "uniform_sphere"}),
-        ProfilesDescription("euclidean",
-                            num_profiles=profiles_per_distribution,
-                            num_voters=n,
-                            num_candidates=m,
-                            args={"num_dimensions": 10, "space": "uniform_sphere"}),
-        ProfilesDescription("euclidean",
-                            num_profiles=profiles_per_distribution,
-                            num_voters=n,
-                            num_candidates=m,
-                            args={"num_dimensions": 3, "space": "uniform_cube"}),
-        ProfilesDescription("euclidean",
-                            num_profiles=profiles_per_distribution,
-                            num_voters=n,
-                            num_candidates=m,
-                            args={"num_dimensions": 10, "space": "uniform_cube"}),
-    ]
-
-    profiles = create_profiles(profiles_descriptions=profiles_descriptions, seed=seed)
-
-    return profiles
-
-
-# def _get_preference_models_and_args(preference_model="all", n_profiles=20, num_profiles=10, prefs_per_profile=50, m=5):
-#     if preference_model == "all":
-#         preference_model = [
-#             "Impartial Culture",
-#             "SP by Conitzer",
-#             "SP by Walsh",
-#             "Single-Crossing",
-#             "1D Uniform",
-#             "2D Uniform",
-#             "3D Uniform",
-#             "5D Uniform",
-#             "10D Uniform",
-#             "20D Uniform",
-#             "2D Sphere",
-#             "3D Sphere",
-#             "5D Sphere",
-#             "Urn",
-#             "Norm-Mallows",
-#         ]
-#     preference_model_short_names = {
-#         "Impartial Culture": "IC",
-#         "SP by Conitzer": "single_peaked_conitzer",
-#         "SP by Walsh": "single_peaked_walsh",
-#         "Single-Crossing": "single_crossing",
-#         "1D Uniform": "euclidean",
-#         "2D Uniform": "euclidean",
-#         "3D Uniform": "euclidean",
-#         "5D Uniform": "euclidean",
-#         "10D Uniform": "euclidean",
-#         "20D Uniform": "euclidean",
-#         "2D Sphere": "euclidean",
-#         "3D Sphere": "euclidean",
-#         "5D Sphere": "euclidean",
-#         "Urn": "URN-R",
-#         "Norm-Mallows": "MALLOWS-RELPHI-R",
-#     }
-#
-#     used_models = {pm: preference_model_short_names[pm] for pm in preference_model}
-#
-#     profiles_per_dist = math.ceil(num_profiles / len(preference_model))
-#     args = {
-#         "n_profiles": profiles_per_dist,
-#         "prefs_per_profile": prefs_per_profile,
-#         "m": m,
-#         "learned_pref_model": "",
-#     }
-#
-#     all_distribution_details = []
-#
-#     for model_name, short_name in used_models.items():
-#         args["learned_pref_model"] = short_name
-#         kwargs = {}
-#         if "Sphere" in model_name:
-#             dimension = model_name.split(" ")[0][:-1]
-#             kwargs["num_dimensions"] = eval(dimension)
-#             kwargs["space"] = "uniform_sphere"
-#         if "Uniform" in model_name:
-#             dimension = model_name.split(" ")[0][:-1]
-#             kwargs["num_dimensions"] = eval(dimension)
-#             kwargs["space"] = "uniform_cube"
-#
-#         all_distribution_details.append((model_name, copy.copy(args), kwargs))
-#
-#     return all_distribution_details
-
-
 def save_profiles(profiles, out_folder="data", filename=None):
     """
     Generate some preference rankings from a variety of distributions.
@@ -320,14 +159,6 @@ def save_profiles(profiles, out_folder="data", filename=None):
         n = len(profiles[0])
         m = len(profiles[0][0])
         filename = f"saved_preferences_n_profiles={k}-n={n}-m={m}"
-
-    # # convert the individual rankings to lists rather than tuples to match format of existing data
-    # final_profiles = []
-    # for prf in pref_profiles:
-    #     new_profile = []
-    #     for rnk in prf:
-    #         new_profile.append(list(rnk))
-    #     final_profiles.append(new_profile)
 
     df = pd.DataFrame({
         'profile': profiles
@@ -363,7 +194,6 @@ def utilities_from_profile(profile, normalize_utilities=False, utility_type="uni
         elif utility_type == "uniform_random":
             # Generate random values, assign them to correct rankings
             util_values = np.random.uniform(low=0, high=1, size=m)
-            # else:
             util_values = util_values.tolist()
             util_values.sort(reverse=True)
         else:
@@ -439,8 +269,14 @@ def weighted_tournament(profile):
     :return: ndarray WT representing the weighted tournament graph of the profile
     """
     if isinstance(profile, pref_voting.profiles.Profile):
+        wt = np.zeros((profile.num_cands, profile.num_cands))
         profile = profile.rankings
-    wt = np.zeros((profile.num_cands, profile.num_cands))
+    elif isinstance(profile, list):
+        m = len(profile[0])
+        wt = np.zeros((m, m))
+    else:
+        raise TypeError(
+            f"Unexpected type for profile. Expected pref_voting.profiles.Profile or list. Got {type(profile)}")
     for v, order in enumerate(profile):
         for i_idx, i in enumerate(order):
             for j_idx, j in enumerate(order):
@@ -449,6 +285,8 @@ def weighted_tournament(profile):
                 if i_idx == len(order) - 1:
                     continue  # don't let i take highest value (redundant)
                 wt[i, j] += 1
+    #
+    # wt[wt == 0] = 1000
 
     return wt
 
@@ -460,16 +298,53 @@ def default_job_name(**kwargs):
     return job_name + "-".join(job_name_terms)
 
 
-if __name__ == "__main__":
+def validate_preference_profiles(profiles):
+    """
+    Determine whether the set of profiles meets the requirements for optimization. At the very least:
+    - profiles must be a list of lists of lists of integers
+    - each inner preference order must have the same candidates
+    - the candidates must be numbered from 0 through m-1
+    - each profile must have the same number of candidates
+    :param profile:
+    :return: tuple of (bool, str) indicating whether the profile is valid and (if applicable) which condition was failed
+    """
+    try:
+        if not isinstance(profiles, list) or not isinstance(profiles[0], list) or not isinstance(profiles[0][0],
+                                                                                                 list) or not (isinstance(
+                profiles[0][0][0], int) or isinstance(profiles[0][0][0], np.int64)):
+            reason = f"profiles must have type List[List[List[int]]]."
+            return False, reason
+    except Exception as e:
+        reason = f"Encountered exception. Input profiles list may be empty. Exception message: {e}"
+        return False, reason
 
+    cands = None
+    for prof in profiles:
+        for order in prof:
+            if cands is None:
+                cands = set(range(len(order)))
+
+            # must rank every candidate exactly once
+            if len(order) != len(cands):
+                reason = "A profile exists in which some candidate is not ranked exactly once."
+                return False, reason
+
+            # must rank candidates 0 through m-1
+            if set(order) != set(cands):
+                reason = f"Must rank all candidates with 0-index labels increasing consecutively. Found profile ranking: {set(order)}"
+                return False, reason
+
+    return True, ""
+
+if __name__ == "__main__":
     pref_dist_options = preference_distribution_options()
     mallows = pref_dist_options["Mallow's"]
     kwargs = {mallows["args"][0]: 0}
 
     mallows_profiles = mallows["function"](n_profiles=5,
-                                                     n=10,
-                                                     m=10,
-                                                     **kwargs)
+                                           n=10,
+                                           m=10,
+                                           **kwargs)
 
     utility_profiles = [utilities_from_profile(prf, normalize_utilities=True) for prf in mallows_profiles]
 

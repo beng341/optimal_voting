@@ -1,6 +1,5 @@
 from mip import Model, xsum, maximize, BINARY, CONTINUOUS, INTEGER
-from optimal_voting.voting_utils import social_welfare_for_alternative_single_profile
-from optimal_voting.data_utils import utilities_from_profile, make_mixed_preference_profiles, rank_matrix
+from optimal_voting.data_utils import utilities_from_profile, rank_matrix
 
 
 def _optimize_score_vector_mip_experimental(social_welfare_lists, rank_matrices):
@@ -186,14 +185,17 @@ def _optimize_score_vector_mip(social_welfare_lists, rank_matrices):
 
 def optimize_score_vector_mip(profiles, utilities, sw_function, max_seconds=20, verbose=False):
     sw_lists = [
-        # [social_welfare_for_alternative_single_profile(utility_profile[j], i, sw_type=sw_function) for i in
+        # [social_welfare_for_alternative_single_profile(utility_profile[j], i, sw_func=sw_function) for i in
         #  range(len(utility_profile[j][0]))]
         # for j in range(len(utility_profile))
     ]
     for j in range(len(utilities)): # each profile
         sw_list = []
         for i in range(len(utilities[j][0])):  # each candidate in the profile
-            sw_list.append(social_welfare_for_alternative_single_profile(utilities[j], i, sw_type=sw_function))
+            sw_list.append(
+                sw_function(i, None, utilities[j])
+            )
+            # sw_list.append(social_welfare_for_alternative_single_profile(utilities[j], i, sw_type=sw_function))
         sw_lists.append(sw_list)
 
     # 3. Make rank matrix for each profile
@@ -234,11 +236,7 @@ if __name__ == "__main__":
     m = 5
 
     # 1. Generate some pref_profiles and their corresponding utility_profile
-    profiles = make_mixed_preference_profiles(profiles_per_distribution=profiles_per_dist,
-                                              n=n,
-                                              m=m,
-                                              seed=4
-                                              )
+    profiles = []   # TODO: DELETED IN REFACTORING, NEEDS QUICK UPDATE
     utilities_for_profiles = [utilities_from_profile(profile, normalize_utilities=False, utility_type="uniform_random") for profile in profiles]
 
 

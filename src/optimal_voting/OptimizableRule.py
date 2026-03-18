@@ -1,5 +1,4 @@
 import copy
-import math
 import os.path
 from abc import abstractmethod
 import random
@@ -50,13 +49,19 @@ class OptimizableRule(Annealer):
                 print("Utilities not provided. Generating utility_profile consistent with profile.")
             for pref_profile in self.pref_profiles:
                 self.utility_profiles.append(utilities_from_profile(pref_profile,
-                                           normalize_utilities=kwargs.get("normalize_utilities", True),
-                                           utility_type=kwargs.get("utility_type", "linear")))
+                                                                    normalize_utilities=kwargs.get("normalize_utilities", True),
+                                                                    utility_type=kwargs.get("utility_type", "linear")))
         if len(self.pref_profiles) == 0:
             if self.verbose:
                 print("Utilities not provided. Generating utility_profile consistent with profile.")
             for util_profile in self.utility_profiles:
                 self.pref_profiles.append(profile_from_utilies(util_profile))
+
+        # Ensure that both profiles are ndarrays instead of lists
+        if isinstance(self.utility_profiles, list):
+            self.utility_profiles = np.array(self.utility_profiles)
+        if isinstance(self.pref_profiles, list):
+            self.pref_profiles = np.array(self.pref_profiles)
 
         # how many winners to compute per profile
         if "num_winners" in kwargs:
@@ -260,26 +265,31 @@ class OptimizableRule(Annealer):
             agg_metric = np.mean
 
         all_winners = self.rule_winners()
-        all_scores = [self.evaluation_function(idx, winners, profile, **self.kwargs) for idx, (winners, profile) in
-                      enumerate(zip(all_winners, self.pref_profiles))]
+        # all_scores = [self.evaluation_function(idx, winners, profile, **self.kwargs) for idx, (winners, profile) in
+        #               enumerate(zip(all_winners, self.pref_profiles))]
+        all_scores = [
+            self.evaluation_function(
+                all_winners[idx],
+                self.pref_profiles[idx],
+                self.utility_profiles[idx],
+                **self.kwargs)
+            for idx in range(len(all_winners))]
         return agg_metric(all_scores)
 
     def energy(self):
-        # A lower energy is considered better.
-        # We aim to minimize energy and we negate the rule score so rule_score should return a higher
-        # value for a better solution.
-        energy = -self.rule_score()
-        return energy
+        # Annealing aims to minimize energy while our evaluation functions are set up for maximization
+        # Negate the rule_score so that these are aligned
+        return -self.rule_score()
 
     def optimize(self, n_steps):
         self.steps = n_steps
 
-        self.updates = n_steps  # call update function at every step; not always necessary
+        self.updates = n_steps
 
         if self.optimization_method == "annealing":
             vector, sw = self.anneal()
         elif self.optimization_method == "gradient_descent":
-            from optimal_voting.gradient_descent import gradient_descent
+            from optimal_voting.dev.gradient_descent import gradient_descent
             vector, sw = gradient_descent(profiles=self.pref_profiles,
                                           utilities=self.kwargs["utility_profiles"],
                                           initial_state=self.kwargs["initial_state"],
@@ -371,15 +381,8 @@ class PositionalScoringRule(OptimizableRule):
         self.m = m
         self.k = k
 
-        if "updates_per_step" in kwargs:
-            self.updates_per_step = kwargs["updates_per_step"]
-        else:
-            self.updates_per_step = 1
-
-        if "randomize" in kwargs:
-            self.randomized = kwargs["randomize"]
-        else:
-            self.randomized = False
+        self.updates_per_step = kwargs.get("updates_per_step", 1)
+        self.randomized = kwargs.get("randomize", False)
 
         if "initial_state" in kwargs and kwargs["initial_state"] is not None:
             state = kwargs["initial_state"]
@@ -398,10 +401,8 @@ class PositionalScoringRule(OptimizableRule):
 
         indices = random.sample(range(self.k-1), self.updates_per_step)
         for index in indices:
-            # index = random.randint(0, self.m - 1)
-            # sign = -1 if bool(random.getrandbits(1)) else 1
             if index > 0:
-                # allow small amount of "overlap" with next index to make it possible to actually become equal
+                # allow small amount of "overlap" with next index to make it possible they become equal
                 amount = random.uniform(0, (self.state[index - 1] - self.state[index])*1.1)
                 amount = min(amount, self.state[index - 1] - self.state[index])
                 # amount = random.uniform(0, self.state[index - 1] - self.state[index])
@@ -426,14 +427,6 @@ class PositionalScoringRule(OptimizableRule):
                        enumerate(self.pref_profiles)]
 
         return winners
-
-
-def time_string(seconds):
-    """Returns time in seconds as a string formatted HHHH:MM:SS."""
-    s = int(round(seconds))  # round to nearest second
-    h, s = divmod(s, 3600)   # get hours and remainder
-    m, s = divmod(s, 60)     # split remainder into minutes and seconds
-    return '%4i:%02i:%02i' % (h, m, s)
 
 
 class RandomizedPositionalScoringRule(PositionalScoringRule):
@@ -549,6 +542,136 @@ class OptimizableThieleRule(OptimizableRule):
         return score
 
 
+class C2ScoringRule(OptimizableRule):
+
+    def __init__(self, pref_profiles, eval_func, **kwargs):
+
+        profiles_clean = []
+        self.margin_matrices = []
+        for profile in pref_profiles:
+            if isinstance(profile, pref_voting.profiles.Profile):
+                profiles_clean.append(profile.rankings)
+            elif isinstance(profile, list):
+                profiles_clean.append(profile)
+            else:
+                raise TypeError(f"Unexpected type for profile. Expected pref_voting.profiles.Profile or list. Got {type(profile)}")
+            self.margin_matrices.append(weighted_tournament(profiles_clean[-1]))
+
+        # Any state with first value set to 1 should be equivalent to Borda's rule
+        # If first val is 0 and second is 0.5 we should have Copeland/Llull's rule
+        if "initial_state" in kwargs and kwargs["initial_state"] is not None:
+            state = kwargs["initial_state"]
+            if isinstance(state, list):
+                state = np.asarray(state)
+        else:
+            # Start from Borda
+            state = np.asarray([1, 0], dtype=float)
+
+        super().__init__(state=state,
+                         pref_profile_lists=profiles_clean,
+                         # pref_profiles=profiles_clean,
+                         eval_func=eval_func,
+                         **kwargs)
+
+    def move(self):
+
+
+        # first index has possible range in [0, 1]
+        # second index has most meaningful range in [0, 1]; could be higher or lower though
+        index = random.randint(0, len(self.state)-1)
+
+        delta_min = -0.2
+        delta_max = 0.2
+        amount = random.uniform(delta_min, delta_max)
+        self.state[index] += amount
+        self.state[index] = min(max(self.state[index], 0), 1)
+
+    def rule_winners(self, winner_type="all_tied"):
+        def mm(x, alpha, axis=-1):
+            """
+            Implement Mellowmax operator from Asadi and Littman (2017)
+            :param x: List or numpy array of values.
+            :param alpha: Function parameter; -inf -> min of values, 0 -> mean, inf -> max of values
+            :param axis: Axis along which to apply the operator (default: -1)
+            :return: Array with reduced dimension along specified axis.
+            """
+            x = np.asarray(x, dtype=float)
+
+            # Handle special cases
+            if np.isposinf(alpha):
+                return np.max(x, axis=axis)
+            elif np.isneginf(alpha):
+                return np.min(x, axis=axis)
+            elif alpha == 0:
+                return np.mean(x, axis=axis)
+
+            # Get reference points along the specified axis
+            x_max = np.max(x, axis=axis, keepdims=True)
+            x_min = np.min(x, axis=axis, keepdims=True)
+            x_ref = np.where(alpha >= 0, x_max, x_min)
+
+            # Compute alpha * (x - x_ref)
+            ax = alpha * (x - x_ref)
+
+            # Apply Boltzmann operator
+            return np.where(
+                alpha == 0,
+                np.mean(x, axis=axis),
+                np.squeeze(x_ref, axis=axis) + np.log(np.mean(np.exp(ax), axis=axis)) / alpha
+            )
+
+        def sigmoid(x):
+            # Safer sigmoid which avoids overflow errors (in practice so far; still technically possible)
+            def _positive_sigmoid(z):
+                return 1 / (1 + np.exp(-z))
+
+            def _negative_sigmoid(z):
+                # Cache exp so you won't have to calculate it twice
+                exp = np.exp(z)
+                return exp / (exp + 1)
+            x *= 100
+            positive = x >= 0
+            # Boolean array inversion is faster than another comparison
+            negative = ~positive
+
+            # empty contains junk hence will be faster to allocate
+            # Zeros has to zero-out the array after allocation, no need for that
+            # See comment to the answer when it comes to dtype
+            result = np.empty_like(x, dtype=float)
+            result[positive] = _positive_sigmoid(x[positive])
+            result[negative] = _negative_sigmoid(x[negative])
+
+            return result
+
+        winners = []
+        winners_tied = []
+        for wt in self.margin_matrices:
+            n_voters = wt[0, 1] + wt[1, 0]
+            a0, a1, a2, a3 = self.state[0], self.state[1], self.state[2], self.state[3]
+            # scores = a*wt + (1-a)*(sigmoid(wt - b*n_voters))
+            side1 = mm(wt, a1)
+            side2 = mm(sigmoid(wt - a2*n_voters), a3)
+
+            scores = a0*side1 + (1-a0)*side2
+            # scores = np.sum(scores, axis=1)
+
+            # find all tied winners and just single lexicographic winner
+            tied_winners = np.where(scores == scores.max())
+            winners_tied.append(tied_winners[0].tolist())
+            winners.append((np.argmax(scores), ))
+
+            if len(tied_winners[0]) > 1:
+                pass
+
+        if winner_type == "all_tied":
+            return winners_tied
+        elif winner_type == "lexicographic":
+            return winners
+        else:
+            raise ValueError(f"Unexpected value {winner_type} for 'winners_type' argument.")
+
+
+
 
 def _optimize_and_report_score(profiles, utilities, eval_func, profile_score_agg_metric, m, n_steps,
                                initial_state=None):
@@ -593,114 +716,9 @@ def _optimize_and_report_score(profiles, utilities, eval_func, profile_score_agg
     return mean_sw, vector
 
 
-class C2ScoringRule(OptimizableRule):
-
-    def __init__(self, pref_profiles, eval_func, **kwargs):
-
-        profiles_clean = []
-        self.margin_matrices = []
-        for profile in pref_profiles:
-            if not isinstance(profile, pref_voting.profiles.Profile):
-                profiles_clean.append(pref_voting.profiles.Profile(profile))
-            else:
-                profiles_clean.append(profile)
-            self.margin_matrices.append(weighted_tournament(profiles_clean[-1]))
-
-        # Any state with first value set to 1 should be equivalent to Borda's rule
-        # If first val is 0 and second is 0.5 we should have Copeland/Llull's rule
-        if "initial_state" in kwargs and kwargs["initial_state"] is not None:
-            state = kwargs["initial_state"]
-            if isinstance(state, list):
-                state = np.asarray(state)
-        else:
-            # Start from Borda
-            state = np.asarray([1, 0], dtype=float)
-
-        super().__init__(state=state,
-                         pref_profiles=profiles_clean,
-                         eval_func=eval_func,
-                         **kwargs)
-
-    def move(self):
-
-
-        # first index has possible range in [0, 1]
-        # second index has most meaningful range in [0, 1]; could be higher or lower though
-        index = random.randint(0, len(self.state)-1)
-
-        delta_min = -0.2
-        delta_max = 0.2
-        amount = random.uniform(delta_min, delta_max)
-        self.state[index] += amount
-        self.state[index] = min(max(self.state[index], 0), 1)
-
-    def rule_winners(self):
-        # def sigmoid(z):
-        #     alpha = 100
-        #     try:
-        #         ret = 1 / (1 + np.exp(-alpha * z))
-        #     except Warning as r:
-        #         ret = 0
-        #     return ret
-        #     # return 1 / (1 + np.exp(-alpha*z))
-
-        def sigmoid(x):
-            # Safer sigmoid which avoids overflow errors (in practice so far; still technically possible)
-            def _positive_sigmoid(z):
-                return 1 / (1 + np.exp(-z))
-
-            def _negative_sigmoid(z):
-                # Cache exp so you won't have to calculate it twice
-                exp = np.exp(z)
-                return exp / (exp + 1)
-            positive = x >= 0
-            # Boolean array inversion is faster than another comparison
-            negative = ~positive
-
-            # empty contains junk hence will be faster to allocate
-            # Zeros has to zero-out the array after allocation, no need for that
-            # See comment to the answer when it comes to dtype
-            result = np.empty_like(x, dtype=float)
-            result[positive] = _positive_sigmoid(x[positive])
-            result[negative] = _negative_sigmoid(x[negative])
-
-            return result
-
-        winners = []
-        winners_borda = []
-        winners_llull = []
-        for wt in self.margin_matrices:
-            n_voters = wt[0, 1] + wt[1, 0]
-            a, b = self.state[0], self.state[1]
-            scores = a*wt + (1-a)*(sigmoid(wt - b*n_voters))
-            scores = np.sum(scores, axis=1)
-            order = scores.argsort()
-            ranks = order.argsort()
-
-            a_borda, b_borda = 1, 0
-            scores_borda = a_borda*wt + (1-a_borda)*(sigmoid(wt - b_borda*n_voters))
-            scores_borda = np.sum(scores_borda, axis=1)
-            order_borda = scores_borda.argsort()
-            ranks_borda = order_borda.argsort()
-
-            a_llull, b_llull = 0, 0.5
-            scores_llull = a_llull*wt + (1-a_llull)*(sigmoid(wt - b_llull*n_voters))
-            scores_llull = np.sum(scores_llull, axis=1)
-            order_llull = scores_llull.argsort()
-            ranks_llull = order_llull.argsort()
-
-            if (ranks != ranks_llull).any():
-                pass
-            if (ranks != ranks_borda).any():
-                pass
-            if (ranks_llull != ranks_borda).any():
-                pass
-
-            # TODO: Really need to consider tie-breaking methods. And returning multiple winners.
-            # find all tied winners for now, to see if this can find the top cycle. Only return one winner.
-            # curr_winners = np.where(scores == scores.max())
-
-            winners.append((np.argmax(scores), ))
-
-        return winners
-
+def time_string(seconds):
+    """Returns time in seconds as a string formatted HHHH:MM:SS."""
+    s = int(round(seconds))  # round to nearest second
+    h, s = divmod(s, 3600)   # get hours and remainder
+    m, s = divmod(s, 60)     # split remainder into minutes and seconds
+    return '%4i:%02i:%02i' % (h, m, s)

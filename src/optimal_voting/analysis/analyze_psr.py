@@ -43,36 +43,7 @@ def evaluate_score_vectors():
     n_candidates = 10
     profiles_per_dist = 50
     profiles_descriptions = [
-        du.ProfilesDescription("IC",
-                               num_profiles=profiles_per_dist,
-                               num_voters=n_voters,
-                               num_candidates=n_candidates,
-                               args=None),
-        du.ProfilesDescription("single_peaked_conitzer",
-                               num_profiles=profiles_per_dist,
-                               num_voters=n_voters,
-                               num_candidates=n_candidates,
-                               args=None),
-        # du.ProfilesDescription("single_peaked_walsh",
-        #                        num_profiles=profiles_per_dist,
-        #                        num_voters=n,
-        #                        num_candidates=m,
-        #                        args=None),
-        du.ProfilesDescription("MALLOWS-RELPHI-R",
-                               num_profiles=profiles_per_dist,
-                               num_voters=n_voters,
-                               num_candidates=n_candidates,
-                               args=None),
-        du.ProfilesDescription("URN-R",
-                               num_profiles=profiles_per_dist,
-                               num_voters=n_voters,
-                               num_candidates=n_candidates,
-                               args=None),
-        du.ProfilesDescription("euclidean",
-                               num_profiles=profiles_per_dist,
-                               num_voters=n_voters,
-                               num_candidates=n_candidates,
-                               args={"num_dimensions": 3, "space": "uniform_sphere"}),
+        # TODO: DELETED IN REFACTORING, NEEDS QUICK UPDATE
     ]
 
     evaluation_functions = {
@@ -98,7 +69,7 @@ def evaluate_score_vectors():
         for prof_desc in profiles_descriptions:
 
             # create new pref_profiles for each different pref distribution
-            profiles = du.create_profiles(profiles_descriptions=[prof_desc])
+            profiles = []   # TODO: DELETED IN REFACTORING, NEEDS QUICK UPDATE
             utilities = [du._utilities_from_profile(profile) for profile in profiles]
 
             # for each utility function, evaluate quality of each score score_vector
@@ -113,7 +84,7 @@ def evaluate_score_vectors():
         else:
             # Also test with each profile distribution together
             # create new pref_profiles for each different pref distribution
-            profiles = du.create_profiles(profiles_descriptions=profiles_descriptions)
+            profiles = []   # TODO: DELETED IN REFACTORING, NEEDS QUICK UPDATE
             utilities = [du._utilities_from_profile(profile) for profile in profiles]
 
             # for each utility function, evaluate quality of each score score_vector

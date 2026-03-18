@@ -32,7 +32,7 @@ def social_welfare_for_positional_score_vector_many_profiles(profiles, all_utili
     return aggregation_method(individual_sws)
 
 
-def social_welfare_for_positional_score_vector_single_profile(profile, utilities, score_vector, sw_type="utilitarian", normalize=False):
+def social_welfare_for_positional_score_vector_single_profile(profile, utilities, score_vector, sw_func, normalize=False):
     """
     Determine the social welfare of the winner of the given score_vector. That is, determine the winner based on
     the positional scoring rule defined by score_vector on the provided profile. Then calculate the social welfare
@@ -46,18 +46,23 @@ def social_welfare_for_positional_score_vector_single_profile(profile, utilities
     Requires that utility_profile is consistent with profile.
     :param score_vector: A positional scoring score_vector where score_vector[i] = p denotes that a candidate ranked in
     position i by a voter should receive p points.
-    :param sw_type: A string corresponding to a pre-defined social welfare function. Supported values are 'utilitarian',
-     'nash_welfare', 'egalitarian', 'malfare', 'distortion-utilitarian', 'distortion-egalitarian'.
+    :param sw_func: A callable social welfare function with standardized signature.
     :param normalize: If set to True, scale each utility result so that the best candidate possible would receive a utility of one and other values are reported relative to this.
     :return:
     """
+    if isinstance(profile, list):
+        profile = np.array(profile)
+    if isinstance(utilities, list):
+        utilities = np.array(utilities)
+
     # Get winner of score_vector
     winner = score_vector_winner(score_vector, profile, randomize=False)
     # get utility of winning alternative
-    sw = social_welfare_for_alternative_single_profile(utilities, winner, sw_type=sw_type)
+    # sw = social_welfare_for_alternative_single_profile(utilities, winner, sw_type=sw_func)
+    sw = sw_func(winner, profile, utilities)
     if normalize:
         # find utility of all candidates in order to scale result
-        all_sw = [social_welfare_for_alternative_single_profile(utilities, cand, sw_type=sw_type) for cand in range(len(score_vector))]
+        all_sw = [sw_func(cand, profile, utilities) for cand in range(len(score_vector))]
         best_sw = max(all_sw)
     else:
         best_sw = 1
@@ -65,137 +70,136 @@ def social_welfare_for_positional_score_vector_single_profile(profile, utilities
     return sw / best_sw
 
 
-def social_welfare_for_alternative_many_profiles(utilities, alternatives, sw_type="utilitarian",
+def social_welfare_for_alternative_many_profiles(utilities, alternatives, sw_func,
                                                  aggregation_method=np.mean, normalize=False):
     """
     Determine the aggregate social welfare for each alternative being elected by voters with the given utility_profile, under
-    the sw_type welfare.
+    the sw_func welfare.
     Use the aggregation_method (default is np.mean) to report a single value corresponding to aggregate social welfare.
     :param utilities: a list of lists where utility_profile[i][j] contains the utility voter i receives if candidate j is
     elected. Assume that this list is complete; all voters have a utility value for each alternative.
     We assume that utility_profile[i] is the utility profile associated with alternatives[i] (e.g., alternatives[i] may have
     been the winner of an election with voters from utility_profile[i])
     :param alternatives: A list of alternatives (type: list(int)) for which social welfare should be calculated.
-    :param sw_type: A string corresponding to a pre-defined social welfare function. Supported values are 'utilitarian',
-     'nash_welfare', 'egalitarian', 'malfare', 'distortion-utilitarian', 'distortion-egalitarian'.
+    :param sw_func: A callable social welfare function with standardized signature.
     :param aggregation_method: Method which accepts a list of floats and returns a single numeric value representing the
     aggregate social welfare across all pref_profiles.
     :param normalize: If set to True, scale each utility result so that the best candidate possible in EACH PROFILE would receive a utility of one and other values in that profiles are reported relative to this.
     :return:
     """
-
-    individual_sws = [social_welfare_for_alternative_single_profile(utilities, alt, sw_type=sw_type, normalize=normalize) for alt in
-                      alternatives]
+    individual_sws = [sw_func(alternatives[idx], None, utilities[idx]) for idx in range(len(alternatives))]
+    # individual_sws = [social_welfare_for_alternative_single_profile(utilities, alt, sw_type=sw_type, normalize=normalize) for alt in
+    #                   alternatives]
     return aggregation_method(individual_sws)
 
 
-def social_welfare_for_alternative_single_profile(utilities, alternative, sw_type="utilitarian", normalize=False):
-    """
-    Determine the social welfare for 'alternative' being elected by voters with the given utility_profile, under
-    the sw_type welfare.
-    NOTE: At the moment both distortion methods are not well-thought-out and should be used only with caution.
-    :param utilities: a list of lists where utility_profile[i][j] contains the utility voter i receives if candidate j is
-    elected. Assume that this list is complete; all voters have a utility value for each alternative.
-    :param alternative: An integer which is the label of one of the candidates. Must be below len(utility_profile[_]).
-    :param sw_type: A string corresponding to a pre-defined social welfare function. Supported values are 'utilitarian',
-     'nash_welfare', 'egalitarian', 'malfare', 'distortion-utilitarian', 'distortion-egalitarian'.
-    :param normalize: If set to True, scale each utility result so that the best candidate possible would receive a utility of one and other values are reported relative to this.
-    :return:
-    """
-    if isinstance(utilities, list):
-        utilities = np.array(utilities)
+# def social_welfare_for_alternative_single_profile(utilities, alternative, sw_type="utilitarian", normalize=False):
+#     """
+#     Determine the social welfare for 'alternative' being elected by voters with the given utility_profile, under
+#     the sw_func welfare.
+#     NOTE: At the moment both distortion methods are not well-thought-out and should be used only with caution.
+#     :param utilities: a list of lists where utility_profile[i][j] contains the utility voter i receives if candidate j is
+#     elected. Assume that this list is complete; all voters have a utility value for each alternative.
+#     :param alternative: An integer which is the label of one of the candidates. Must be below len(utility_profile[_]).
+#     :param sw_type: A string corresponding to a pre-defined social welfare function. Supported values are 'utilitarian',
+#      'nash_welfare', 'egalitarian', 'malfare', 'distortion-utilitarian', 'distortion-egalitarian'.
+#     :param normalize: If set to True, scale each utility result so that the best candidate possible would receive a utility of one and other values are reported relative to this.
+#     :return:
+#     """
+#     if isinstance(utilities, list):
+#         utilities = np.array(utilities)
+#
+#     def single_alternative_welfare(alt):
+#         if sw_type == "utilitarian":
+#             sw = sum(utilities[:, alt])
+#         elif sw_type == "nash_welfare" or sw_type == "nash":
+#             # Keep a more scalable value by taking sum of logs rather than product
+#             sw = sum(np.log(utilities[:, alt] + 0.000001))
+#             # sw = np.prod(utility_profile[:, alternative])
+#         elif sw_type == "egalitarian":
+#             sw = min(utilities[:, alt])
+#         elif sw_type == "malfare":
+#             sw = max(utilities[:, alt])
+#         elif sw_type == "distortion-utilitarian":
+#             # find best possible utilitarian social welfare
+#             m = len(utilities[0])
+#             all_u_sws = [sum(utilities[:, a]) for a in range(m)]
+#             best_sw = max(all_u_sws)
+#             # return ratio of best utilitarian sw to actual utilitarian sw
+#
+#             # we're thinking in a maximization context; invert the value so that higher is better
+#             sw = 1 / (best_sw / sum(utilities[:, alt]))
+#         elif sw_type == "distortion-egalitarian":
+#             # find best possible egalitarian social welfare
+#             m = len(utilities[0])
+#             all_u_sws = [min(utilities[:, a]) for a in range(m)]
+#             best_sw = max(all_u_sws)
+#             # return ratio of best egalitarian sw to actual egalitarian sw
+#
+#             # we're thinking in a maximization context; invert the value so that higher is better
+#             sw = 1 / (best_sw / min(utilities[:, alt]))
+#         else:
+#             raise ValueError(f"Unexpected welfare type. Received '{sw_type}'.")
+#         return sw
+#
+#     if normalize:
+#         all_sw = [single_alternative_welfare(idx) for idx in range(len(utilities[0]))]
+#         all_sw = [sw / max(all_sw) for sw in all_sw]
+#         sw_alt = all_sw[alternative]
+#     else:
+#         sw_alt = single_alternative_welfare(alternative)
+#
+#     return sw_alt
 
-    def single_alternative_welfare(alt):
-        if sw_type == "utilitarian":
-            sw = sum(utilities[:, alt])
-        elif sw_type == "nash_welfare" or sw_type == "nash":
-            # Keep a more scalable value by taking sum of logs rather than product
-            sw = sum(np.log(utilities[:, alt] + 0.000001))
-            # sw = np.prod(utility_profile[:, alternative])
-        elif sw_type == "egalitarian":
-            sw = min(utilities[:, alt])
-        elif sw_type == "malfare":
-            sw = max(utilities[:, alt])
-        elif sw_type == "distortion-utilitarian":
-            # find best possible utilitarian social welfare
-            m = len(utilities[0])
-            all_u_sws = [sum(utilities[:, a]) for a in range(m)]
-            best_sw = max(all_u_sws)
-            # return ratio of best utilitarian sw to actual utilitarian sw
 
-            # we're thinking in a maximization context; invert the value so that higher is better
-            sw = 1 / (best_sw / sum(utilities[:, alt]))
-        elif sw_type == "distortion-egalitarian":
-            # find best possible egalitarian social welfare
-            m = len(utilities[0])
-            all_u_sws = [min(utilities[:, a]) for a in range(m)]
-            best_sw = max(all_u_sws)
-            # return ratio of best egalitarian sw to actual egalitarian sw
-
-            # we're thinking in a maximization context; invert the value so that higher is better
-            sw = 1 / (best_sw / min(utilities[:, alt]))
-        else:
-            raise ValueError(f"Unexpected welfare type. Received '{sw_type}'.")
-        return sw
-
-    if normalize:
-        all_sw = [single_alternative_welfare(idx) for idx in range(len(utilities[0]))]
-        all_sw = [sw / max(all_sw) for sw in all_sw]
-        sw_alt = all_sw[alternative]
-    else:
-        sw_alt = single_alternative_welfare(alternative)
-
-    return sw_alt
-
-
-def social_welfare_for_alternative_single_profile_torch(utilities, alternative, type="utilitarian"):
-    """
-    Determine the social welfare for 'alternative' being elected by voters with the given utility_profile, under
-    the sw_type welfare.
-    NOTE: At the moment both distortion methods are not well-thought-out and should be used only with caution.
-    :param utilities: a list of lists where utility_profile[i][j] contains the utility voter i receives if candidate j is
-    elected. Assume that this list is complete; all voters have a utility value for each alternative.
-    :param alternative: An integer which is the label of one of the candidates. Must be below len(utility_profile[_]).
-    :param sw_type: A string corresponding to a pre-defined social welfare function. Supported values are 'utilitarian',
-     'nash_welfare', 'egalitarian', 'malfare', 'distortion-utilitarian', 'distortion-egalitarian'.
-    :return:
-    """
-    import torch
-    if isinstance(utilities, list):
-        utilities = np.array(utilities)
-
-    if type == "utilitarian":
-        sw = torch.sum(utilities[:, alternative])
-    elif type == "nash_welfare":
-        # Keep a more scalable value by taking sum of logs rather than product
-        sw = torch.sum(np.log(utilities[:, alternative]))
-        # sw = np.prod(utility_profile[:, alternative])
-    elif type == "egalitarian":
-        sw = torch.min(utilities[:, alternative])
-    elif type == "malfare":
-        sw = torch.max(utilities[:, alternative])
-    elif type == "distortion-utilitarian":
-        # find best possible utilitarian social welfare
-        m = len(utilities[0])
-        all_u_sws = [torch.sum(utilities[:, a]) for a in range(m)]
-        best_sw = torch.max(all_u_sws)
-        # return ratio of best utilitarian sw to actual utilitarian sw
-
-        # we're maximizing it so we should somehow invert the value
-        sw = 1 / (best_sw / torch.sum(utilities[:, alternative]))
-    elif type == "distortion-egalitarian":
-        # find best possible egalitarian social welfare
-        m = len(utilities[0])
-        all_u_sws = [torch.min(utilities[:, a]) for a in range(m)]
-        best_sw = torch.max(all_u_sws)
-        # return ratio of best egalitarian sw to actual egalitarian sw
-
-        # we're maximizing it so we should somehow invert the value
-        sw = 1 / (best_sw / torch.min(utilities[:, alternative]))
-    else:
-        sw = -1
-
-    return sw
+# def social_welfare_for_alternative_single_profile_torch(utilities, alternative, type="utilitarian"):
+#     """
+#     Determine the social welfare for 'alternative' being elected by voters with the given utility_profile, under
+#     the sw_func welfare.
+#     NOTE: At the moment both distortion methods are not well-thought-out and should be used only with caution.
+#     :param utilities: a list of lists where utility_profile[i][j] contains the utility voter i receives if candidate j is
+#     elected. Assume that this list is complete; all voters have a utility value for each alternative.
+#     :param alternative: An integer which is the label of one of the candidates. Must be below len(utility_profile[_]).
+#     :param sw_func: A string corresponding to a pre-defined social welfare function. Supported values are 'utilitarian',
+#      'nash_welfare', 'egalitarian', 'malfare', 'distortion-utilitarian', 'distortion-egalitarian'.
+#     :return:
+#     """
+#     import torch
+#     if isinstance(utilities, list):
+#         utilities = np.array(utilities)
+#
+#     if type == "utilitarian":
+#         sw = torch.sum(utilities[:, alternative])
+#     elif type == "nash_welfare":
+#         # Keep a more scalable value by taking sum of logs rather than product
+#         sw = torch.sum(np.log(utilities[:, alternative]))
+#         # sw = np.prod(utility_profile[:, alternative])
+#     elif type == "egalitarian":
+#         sw = torch.min(utilities[:, alternative])
+#     elif type == "malfare":
+#         sw = torch.max(utilities[:, alternative])
+#     elif type == "distortion-utilitarian":
+#         # find best possible utilitarian social welfare
+#         m = len(utilities[0])
+#         all_u_sws = [torch.sum(utilities[:, a]) for a in range(m)]
+#         best_sw = torch.max(all_u_sws)
+#         # return ratio of best utilitarian sw to actual utilitarian sw
+#
+#         # we're maximizing it so we should somehow invert the value
+#         sw = 1 / (best_sw / torch.sum(utilities[:, alternative]))
+#     elif type == "distortion-egalitarian":
+#         # find best possible egalitarian social welfare
+#         m = len(utilities[0])
+#         all_u_sws = [torch.min(utilities[:, a]) for a in range(m)]
+#         best_sw = torch.max(all_u_sws)
+#         # return ratio of best egalitarian sw to actual egalitarian sw
+#
+#         # we're maximizing it so we should somehow invert the value
+#         sw = 1 / (best_sw / torch.min(utilities[:, alternative]))
+#     else:
+#         sw = -1
+#
+#     return sw
 
 
 def score_vector_winner_tensor(score_vector, profile):
@@ -243,8 +247,9 @@ def score_vector_winner(score_vector, profile, randomize=False):
     scores = np.sum(scores, axis=0)
 
     if randomize:
+        m = len(scores)
         if sum(scores) == 0:
-            prob_normed = [1 / len(scores) for _ in range(len(scores))]
+            prob_normed = [1 /m for _ in range(m)]
         else:
             prob_normed = [s / sum(scores) for s in scores]
         winner = np.random.choice(list(range(m)), size=1, p=prob_normed)[0]
@@ -314,50 +319,50 @@ def score_vector_scores(score_vector, profile, normalize=False, voter_weights=No
     return scores
 
 
-def utilitarian_distortion(unique_id, winners, profile, **kwargs):
-    return social_welfare_for_alternative_single_profile(kwargs["utility_profiles"][unique_id], winners,
-                                                         sw_type="distortion-utilitarian")
+def utilitarian_distortion(rule_output, pref_profile=None, utility_profile=None, **kwargs):
+    winner = rule_output[0] if isinstance(rule_output, tuple) else rule_output     # Expecting a singleton tuple, extract to get a single winning alternative.
+
+    m = len(utility_profile[0])
+    all_u_sws = [sum(utility_profile[:, a]) for a in range(m)]
+    best_sw = max(all_u_sws)
+    # return ratio of best utilitarian sw to actual utilitarian sw
+
+    # we're thinking in a maximization context; invert the value so that higher is better
+    return 1 / (best_sw / sum(utility_profile[:, winner]))
 
 
-def egalitarian_distortion(unique_id, winners, profile, **kwargs):
-    return social_welfare_for_alternative_single_profile(kwargs["utility_profiles"][unique_id], winners,
-                                                         sw_type="distortion-egalitarian")
+def egalitarian_distortion(rule_output, pref_profile=None, utility_profile=None, **kwargs):
+    winner = rule_output[0] if isinstance(rule_output, tuple) else rule_output     # Expecting a singleton tuple, extract to get a single winning alternative.
+
+    # find best possible egalitarian social welfare
+    m = len(utility_profile[0])
+    all_u_sws = [min(utility_profile[:, a]) for a in range(m)]
+    best_sw = max(all_u_sws)
+    # return ratio of best egalitarian sw to actual egalitarian sw
+
+    # we're thinking in a maximization context; invert the value so that higher is better
+    return 1 / (best_sw / min(utility_profile[:, winner]))
 
 
-def utilitarian_social_welfare(unique_id, winners, profile, **kwargs):
-    return social_welfare_for_alternative_single_profile(kwargs["utility_profiles"][unique_id], winners, sw_type="utilitarian")
+def utilitarian_social_welfare(rule_output, pref_profile=None, utility_profile=None, **kwargs):
+    winner = rule_output[0] if isinstance(rule_output, tuple) else rule_output     # Expecting a singleton tuple, extract to get a single winning alternative.
+    return sum(utility_profile[:, winner])
 
 
-def nash_social_welfare(unique_id, winners, profile, **kwargs):
-    return social_welfare_for_alternative_single_profile(kwargs["utility_profiles"][unique_id], winners,
-                                                         sw_type="nash_welfare")
+def nash_social_welfare(rule_output, pref_profile=None, utility_profile=None, **kwargs):
+    winner = rule_output[0] if isinstance(rule_output, tuple) else rule_output     # Expecting a singleton tuple, extract to get a single winning alternative.
+    # return np.prod(utility_profile[:, alternative])
+    return sum(np.log(utility_profile[:, winner] + 0.000001))
 
 
-def egalitarian_social_welfare(unique_id, winners, profile, **kwargs):
-    return social_welfare_for_alternative_single_profile(kwargs["utility_profiles"][unique_id], winners, sw_type="egalitarian")
+def egalitarian_social_welfare(rule_output, pref_profile=None, utility_profile=None, **kwargs):
+    winner = rule_output[0] if isinstance(rule_output, tuple) else rule_output     # Expecting a singleton tuple, extract to get a single winning alternative.
+    return min(utility_profile[:, winner])
 
 
-def malfare_social_welfare(unique_id, winners, profile, **kwargs):
-    return social_welfare_for_alternative_single_profile(kwargs["utility_profiles"][unique_id], winners, sw_type="malfare")
-
-
-# def social_welfare_of_score_vector_over_many_profiles(score_vector, pref_profiles, utility_profile, utility_type="utilitarian"):
-#     """
-#     Compute the utilitarian social welfare across a list of multiple pref_profiles/elections. Sum the
-#     utility_type from each and return the result.
-#     Utilitarian SW is the total sum of social welfare over all voters.
-#     :param score_vector:
-#     :param pref_profiles:
-#     :param utility_profile:
-#     :param utility_type:
-#     :return:
-#     """
-#     all_score_vector_utilities = [score_vector_social_welfare_single_profile(score_vector,
-#                                                                              pref_profiles[idx],
-#                                                                              utility_profile[idx],
-#                                                                              utility_type=utility_type)
-#                                   for idx in range(len(pref_profiles))]
-#     return sum(all_score_vector_utilities), np.mean(all_score_vector_utilities)
+def malfare_social_welfare(rule_output, pref_profile=None, utility_profile=None, **kwargs):
+    winner = rule_output[0] if isinstance(rule_output, tuple) else rule_output     # Expecting a singleton tuple, extract to get a single winning alternative.
+    return max(utility_profile[:, winner])
 
 
 def normalize_score_vector(vec):
